@@ -356,7 +356,7 @@ elif menu == "View Weekly Report":
 
 # --- TAB 3: SUMMARY DASHBOARD ---
 elif menu == "Summary Dashboard":
-  st.header("📈 TAPAT Summary Dashboard")
+  st.header("📈 Weekly Parking Report")
   st.caption("Service-by-service vehicle counts and location subtotals.")
 
   df = load_data()
