@@ -311,7 +311,7 @@ elif menu == "View Weekly Report":
         )
 
 # --- TAB 3: EXECUTIVE DASHBOARD ---
-elif menu == "Dashboard (Tab 3)":
+elif menu == "Dashboard":
   st.header("📈 TAPAT Executive Parking Dashboard")
   st.caption(
       "Comprehensive weekly traffic metrics and location breakdowns for"
