@@ -311,7 +311,7 @@ elif menu == "View Weekly Report":
         )
 
 # --- TAB 3: EXECUTIVE DASHBOARD ---
-elif menu == "Dashboard":
+elif menu == "Dashboard (Tab 3)":
   st.header("📈 TAPAT Executive Parking Dashboard")
   st.caption(
       "Comprehensive weekly traffic metrics and location breakdowns for"
@@ -322,8 +322,8 @@ elif menu == "Dashboard":
     st.info("No parking logs found yet.")
   else:
     col_week, col_loc = st.columns(2)
-
     current_week = datetime.now().isocalendar()[1]
+
     with col_week:
       selected_week = st.number_input(
           "Select Dashboard Week:",
@@ -345,7 +345,6 @@ elif menu == "Dashboard":
     if week_df.empty:
       st.warning(f"No parking data recorded for Week {selected_week}.")
     else:
-      # Filter by location if specified
       if selected_dash_loc != "All Locations":
         filtered_dash_df = week_df[week_df["Location"] == selected_dash_loc]
       else:
@@ -356,12 +355,11 @@ elif menu == "Dashboard":
             f"No records logged for {selected_dash_loc} in Week {selected_week}."
         )
       else:
-        # Calculate Grand Totals Across All Included Locations
+        # Top Metrics
         total_cars_all = filtered_dash_df["Car_Count"].sum()
         total_motors_all = filtered_dash_df["Motorcycle_Count"].sum()
         grand_total_vehicles = total_cars_all + total_motors_all
 
-        # --- TOP LEVEL DASHBOARD METRICS ---
         st.markdown("---")
         st.subheader("🌐 Overall Ministry Grand Totals")
 
@@ -372,7 +370,7 @@ elif menu == "Dashboard":
 
         st.markdown("---")
 
-        # --- BREAKDOWN PER LOCATION & SERVICE ---
+        # Location Breakdowns
         if selected_dash_loc == "All Locations":
           target_locations = list(LOCATION_CONFIG.keys())
         else:
@@ -380,10 +378,8 @@ elif menu == "Dashboard":
 
         for loc in target_locations:
           loc_df = week_df[week_df["Location"] == loc]
-
           if not loc_df.empty:
             st.markdown(f"### 📍 {loc}")
-
             service_grouped = (
                 loc_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
                 .sum()
@@ -392,15 +388,12 @@ elif menu == "Dashboard":
 
             loc_cars = 0
             loc_motors = 0
-
-            # List services formatted neatly
             for _, row in service_grouped.iterrows():
               svc = row["Service"]
               c = int(row["Car_Count"])
               m = int(row["Motorcycle_Count"])
               loc_cars += c
               loc_motors += m
-
               st.write(f"• **{svc}:** {c:,} Cars | {m:,} Motorcycles")
 
             loc_combined = loc_cars + loc_motors
