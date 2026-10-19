@@ -36,6 +36,7 @@ LOCATION_CONFIG = {
             "6th Service",
             "7th Service",
             "8th Service",
+            "Palmas Resort",
             "Tuesday Worship Service",
             "Salvation Night",
             "Empowered Night",
