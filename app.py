@@ -85,6 +85,10 @@ LOCATION_CONFIG = {
         "areas": [
             "Main Parking",
         ],
+        "services": [
+            "Whole Day",
+           
+        ],
     },
 }
 
