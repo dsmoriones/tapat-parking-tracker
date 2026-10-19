@@ -148,16 +148,13 @@ with st.sidebar.expander("⚙️ App Customization"):
 if menu == "Log Parking Counts":
   st.header("Church of God Dasmarinas Parking Tracker")
 
-  # 1. Select Location first
   selected_location = st.selectbox(
       "Select Church Location:", list(LOCATION_CONFIG.keys())
   )
 
-  # Fetch specific services and areas for the chosen location
   active_services = LOCATION_CONFIG[selected_location]["services"]
   active_parking_areas = LOCATION_CONFIG[selected_location]["areas"]
 
-  # 2. Select Worship Service dynamically based on the chosen location
   selected_service = st.selectbox("Select Worship Service:", active_services)
   log_date = st.date_input("Date", datetime.now())
 
@@ -171,7 +168,6 @@ if menu == "Log Parking Counts":
   with st.form("table_entry_form"):
     counts_data = {}
 
-    # Create input fields dynamically for each area belonging to this location
     for area in active_parking_areas:
       st.markdown(f"**📍 {area}**")
       col1, col2 = st.columns(2)
@@ -203,15 +199,13 @@ if menu == "Log Parking Counts":
     if submit_button:
       now = datetime.now()
 
-      # --- SUNDAY ADJUSTMENT LOGIC ---
-      # If the selected date is Sunday (weekday == 6), shift calculation date back by 1 day
+      # Sunday Adjustment Logic
       if log_date.weekday() == 6:
         calc_date = log_date - timedelta(days=1)
       else:
         calc_date = log_date
 
       week_num = calc_date.isocalendar()[1]
-      # -----------------------------
 
       saved_image_path = ""
 
@@ -258,7 +252,6 @@ elif menu == "View Weekly Report":
   if df.empty:
     st.info("No parking logs found yet.")
   else:
-    # Adjust current week calculation if today is Sunday
     today = datetime.now()
     if today.weekday() == 6:
       curr_calc_date = today - timedelta(days=1)
@@ -374,4 +367,102 @@ elif menu == "Summary Dashboard":
     col_week, col_loc = st.columns(2)
 
     today = datetime.now()
-    if today.weekday()
+    if today.weekday() == 6:
+      curr_calc_date = today - timedelta(days=1)
+    else:
+      curr_calc_date = today
+
+    current_week = curr_calc_date.isocalendar()[1]
+
+    with col_week:
+      selected_week = st.number_input(
+          "Select Week Number:",
+          min_value=1,
+          max_value=53,
+          value=int(current_week),
+          key="dash_week",
+      )
+
+    with col_loc:
+      selected_dash_loc = st.selectbox(
+          "Filter by Church Location:",
+          ["All Locations"] + list(LOCATION_CONFIG.keys()),
+          key="dash_loc_filter",
+      )
+
+    week_df = df[df["Week_Number"] == selected_week]
+
+    if week_df.empty:
+      st.warning(f"No records found for Week {selected_week}.")
+    else:
+      if selected_dash_loc != "All Locations":
+        filtered_dash_df = week_df[week_df["Location"] == selected_dash_loc]
+      else:
+        filtered_dash_df = week_df
+
+      if filtered_dash_df.empty:
+        st.warning(
+            f"No records logged for {selected_dash_loc} in Week {selected_week}."
+        )
+      else:
+        total_cars_all = filtered_dash_df["Car_Count"].sum()
+        total_motors_all = filtered_dash_df["Motorcycle_Count"].sum()
+        grand_total_vehicles = total_cars_all + total_motors_all
+
+        st.markdown("---")
+        st.subheader("🌐 Ministry Overall Totals")
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("🚘 Total Cars", f"{total_cars_all:,}")
+        col2.metric("🛵 Total Motorcycles", f"{total_motors_all:,}")
+        col3.metric("🚘+🛵 Total Vehicles", f"{grand_total_vehicles:,}")
+
+        st.markdown("---")
+
+        if selected_dash_loc == "All Locations":
+          target_locations = list(LOCATION_CONFIG.keys())
+        else:
+          target_locations = [selected_dash_loc]
+
+        for loc in target_locations:
+          loc_df = week_df[week_df["Location"] == loc]
+
+          if not loc_df.empty:
+            st.markdown(f"### 📍 {loc}")
+
+            service_grouped = (
+                loc_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
+                .sum()
+                .reset_index()
+            )
+
+            config_services = LOCATION_CONFIG[loc]["services"]
+            service_grouped["Service"] = pd.Categorical(
+                service_grouped["Service"],
+                categories=config_services,
+                ordered=True,
+            )
+            service_grouped = service_grouped.sort_values("Service")
+
+            loc_cars = 0
+            loc_motors = 0
+
+            for _, row in service_grouped.iterrows():
+              svc = row["Service"]
+              c = int(row["Car_Count"])
+              m = int(row["Motorcycle_Count"])
+              tot = c + m
+              loc_cars += c
+              loc_motors += m
+
+              st.write(
+                  f"• **{svc}:** {c:,} Cars | {m:,} Motorcycles *(Total:"
+                  f" {tot:,})*"
+              )
+
+            loc_combined = loc_cars + loc_motors
+            st.info(
+                f"**{loc} Subtotal:** {loc_cars:,} Cars + {loc_motors:,}"
+                f" Motorcycles = **{loc_combined:,} Total Vehicles**"
+            )
+            st.markdown("")
