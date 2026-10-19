@@ -128,7 +128,7 @@ with st.sidebar.expander("⚙️ App Customization"):
     st.success("Header banner updated! Refresh the page to see it.")
 
 # --- TAB 1: LOG PARKING COUNTS ---
-if menu == "Log Parking Counts":
+if menu == "Church of God Dasmarinas Parking Tracker":
   st.header("Log Service Parking Counts")
 
   # 1. Select Location first
