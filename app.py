@@ -136,7 +136,7 @@ with st.sidebar.expander("⚙️ App Customization"):
 
 # --- TAB 1: LOG PARKING COUNTS ---
 if menu == "Log Parking Counts":
-  st.header("Log Service Parking Counts")
+  st.header("Church of God Dasmarinas Parking Tracker")
 
   selected_location = st.selectbox(
       "Select Church Location:", list(LOCATION_CONFIG.keys())
