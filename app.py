@@ -118,7 +118,7 @@ st.set_page_config(
 if os.path.exists(HEADER_BANNER_PATH):
   st.image(HEADER_BANNER_PATH, use_container_width=True)
 else:
-  st.title("🚗 TAPAT Parking Management System")
+  st.title("🚗 TAPAT Parking Management System 🚗")
 
 # Sidebar navigation & settings
 st.sidebar.title("Navigation & Settings")
