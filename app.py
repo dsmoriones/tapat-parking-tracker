@@ -114,10 +114,16 @@ if os.path.exists(HEADER_BANNER_PATH):
 else:
   st.title("🚗 TAPAT Parking Management System")
 
-# Sidebar navigation & settings
+# --- SIDEBAR NAVIGATION (NOW 3 TABS) ---
 st.sidebar.title("Navigation & Settings")
-menu = st.sidebar.radio("Go to", ["Log Parking Counts", "View Weekly Report"])
+menu = st.sidebar.radio(
+    "Go to",
+    ["Log Parking Counts", "View Weekly Report", "Service Summary (Tab 3)"],
+)
 
+df = load_data()
+
+# --- APP CUSTOMIZATION SIDEBAR ---
 with st.sidebar.expander("⚙️ App Customization"):
   custom_banner = st.file_uploader(
       "Upload Header Banner Image", type=["png", "jpg", "jpeg"]
@@ -125,7 +131,8 @@ with st.sidebar.expander("⚙️ App Customization"):
   if custom_banner is not None:
     banner_img = Image.open(custom_banner)
     banner_img.save(HEADER_BANNER_PATH)
-    st.success("Header banner updated! Refresh the page to see it.")
+    st.success("Header banner updated! Refresh page.")
+
 
 # --- TAB 1: LOG PARKING COUNTS ---
 if menu == "Log Parking Counts":
