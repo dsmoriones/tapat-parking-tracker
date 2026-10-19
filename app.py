@@ -174,7 +174,7 @@ if menu == "Log Parking Counts":
       st.markdown("")
 
     st.markdown("---")
-    st.subheader("📷 Attach Verification Photo (Optional)")
+    st.subheader("📷 Incident Photograph (Optional)")
     uploaded_file = st.file_uploader(
         "Choose an image file or take a photo", type=["png", "jpg", "jpeg"]
     )
