@@ -129,18 +129,15 @@ with st.sidebar.expander("⚙️ App Customization"):
 
 # --- TAB 1: LOG PARKING COUNTS ---
 if menu == "Log Parking Counts":
-  st.header("Church of God Dasmarinas Parking Tracker")
+  st.header("Log Service Parking Counts")
 
-  # 1. Select Location first
   selected_location = st.selectbox(
       "Select Church Location:", list(LOCATION_CONFIG.keys())
   )
 
-  # Fetch specific services and areas for the chosen location
   active_services = LOCATION_CONFIG[selected_location]["services"]
   active_parking_areas = LOCATION_CONFIG[selected_location]["areas"]
 
-  # 2. Select Worship Service dynamically based on the chosen location
   selected_service = st.selectbox("Select Worship Service:", active_services)
   log_date = st.date_input("Date", datetime.now())
 
@@ -154,7 +151,6 @@ if menu == "Log Parking Counts":
   with st.form("table_entry_form"):
     counts_data = {}
 
-    # Create input fields dynamically for each area belonging to this location
     for area in active_parking_areas:
       st.markdown(f"**📍 {area}**")
       col1, col2 = st.columns(2)
@@ -174,7 +170,7 @@ if menu == "Log Parking Counts":
       st.markdown("")
 
     st.markdown("---")
-    st.subheader("📷 Incident Photograph (Optional)")
+    st.subheader("📷 Attach Verification Photo (Optional)")
     uploaded_file = st.file_uploader(
         "Choose an image file or take a photo", type=["png", "jpg", "jpeg"]
     )
@@ -226,8 +222,6 @@ if menu == "Log Parking Counts":
 elif menu == "View Weekly Report":
   st.header("📊 Weekly Summary Report")
 
-  df = load_data()
-
   if df.empty:
     st.info("No parking logs found yet.")
   else:
@@ -253,7 +247,9 @@ elif menu == "View Weekly Report":
         filtered_df = filtered_df[filtered_df["Location"] == report_location]
 
       if filtered_df.empty:
-        st.warning(f"No records found for {report_location} in Week {selected_week}.")
+        st.warning(
+            f"No records found for {report_location} in Week {selected_week}."
+        )
       else:
         filtered_df["Total_Vehicles"] = (
             filtered_df["Car_Count"] + filtered_df["Motorcycle_Count"]
@@ -268,6 +264,16 @@ elif menu == "View Weekly Report":
             .sum()
             .reset_index()
         )
+
+        if report_location != "All Locations":
+          custom_order = LOCATION_CONFIG[report_location]["areas"]
+          summary_table["Parking_Area"] = pd.Categorical(
+              summary_table["Parking_Area"],
+              categories=custom_order,
+              ordered=True,
+          )
+          summary_table = summary_table.sort_values("Parking_Area")
+
         summary_table.columns = [
             "Location",
             "Parking Area",
@@ -297,19 +303,60 @@ elif menu == "View Weekly Report":
             mime="text/csv",
         )
 
-        photos = filtered_df[
-            filtered_df["Photo_Path"].notna() & (filtered_df["Photo_Path"] != "")
-        ]["Photo_Path"].unique()
+# --- TAB 3: SERVICE SUMMARY ---
+elif menu == "Service Summary (Tab 3)":
+  st.header("📋 Service-by-Service Summary")
+  st.caption("View totals grouped by service and location for any given week.")
 
-        if len(photos) > 0:
+  if df.empty:
+    st.info("No parking logs found yet.")
+  else:
+    current_week = datetime.now().isocalendar()[1]
+    selected_week = st.number_input(
+        "Select Week Number for Summary:",
+        min_value=1,
+        max_value=53,
+        value=int(current_week),
+        key="tab3_week",
+    )
+
+    week_df = df[df["Week_Number"] == selected_week]
+
+    if week_df.empty:
+      st.warning(f"No records found for Week {selected_week}.")
+    else:
+      # Loop through each location configured
+      for location_name in LOCATION_CONFIG.keys():
+        loc_df = week_df[week_df["Location"] == location_name]
+
+        if not loc_df.empty:
+          st.markdown(f"### 📍 {location_name}")
+
+          # Group by Service
+          service_grouped = (
+              loc_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
+              .sum()
+              .reset_index()
+          )
+
+          loc_total_cars = 0
+          loc_total_motors = 0
+
+          for _, row in service_grouped.iterrows():
+            svc = row["Service"]
+            cars = int(row["Car_Count"])
+            motors = int(row["Motorcycle_Count"])
+
+            loc_total_cars += cars
+            loc_total_motors += motors
+
+            # Display exactly in your requested format
+            st.markdown(f"- **{svc}:** {cars} Cars, {motors} Motorcycles")
+
+          # Location Combined Total
+          comb_total = loc_total_cars + loc_total_motors
+          st.markdown(
+              f"**Total:** {loc_total_cars} Cars, {loc_total_motors}"
+              f" Motorcycles *(Combined Grand Total: {comb_total}*)"
+          )
           st.markdown("---")
-          st.subheader("🖼️ Attached Verification Photos")
-          cols = st.columns(min(len(photos), 3))
-          for idx, photo_path in enumerate(photos):
-            if os.path.exists(photo_path):
-              with cols[idx % 3]:
-                st.image(
-                    photo_path,
-                    caption=os.path.basename(photo_path),
-                    use_container_width=True,
-                )
