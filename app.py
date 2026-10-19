@@ -12,7 +12,7 @@ HEADER_BANNER_PATH = "tapat_banner.png"
 if not os.path.exists(IMAGE_DIR):
   os.makedirs(IMAGE_DIR)
 
-# Define Church Locations with their own specific Parking Areas AND Services
+# Configuration mapping locations, areas, and services
 LOCATION_CONFIG = {
     "COG Dasma - Main": {
         "areas": [
@@ -26,7 +26,6 @@ LOCATION_CONFIG = {
             "Parking 8",
             "Parking 9",
             "Parking 10",
-            
         ],
         "services": [
             "1st Service",
@@ -37,28 +36,13 @@ LOCATION_CONFIG = {
             "6th Service",
             "7th Service",
             "8th Service",
-            "Tuesday Worship Service",
-            "Salvation Night",
-            "Empowered Night",
-        ],
-    },
-    "COG Jabez": {
-        "areas": [
-            "Open Parking",
-            
-        ],
-        "services": [
-            "1st Service",
-            "2nd Service",
-            "3rd Service",
-            "4th Service",
-            "5th Service",
         ],
     },
     "COG Trece": {
         "areas": [
             "Main Parking",
             "BIR",
+                           
         ],
         "services": [
             "1st Service",
@@ -68,21 +52,35 @@ LOCATION_CONFIG = {
             "5th Service",
             "6th Service",
             "7th Service",
+         ],
+    },
+    "COG Jabez": {
+        "areas": [
+            "Open Parking",
+                           
         ],
+        "services": [
+            "1st Service",
+            "2nd Service",
+            "3rd Service",
+            "4th Service",
+            "5th Service",
+         ],
     },
     "COG Silang": {
         "areas": [
             "Main Parking",
+                           
         ],
-        "services":[
+        "services": [
             "1st Service",
             "2nd Service",
             "3rd Service",
             "4th Service",
             "5th Service",
             "6th Service",
-        ]
-    }
+         ],
+    },
 }
 
 
@@ -108,22 +106,22 @@ st.set_page_config(
     page_title="TAPAT Parking Tracker", page_icon="🚗", layout="centered"
 )
 
-# --- HEADER IMAGE SECTION ---
+# Header Banner
 if os.path.exists(HEADER_BANNER_PATH):
   st.image(HEADER_BANNER_PATH, use_container_width=True)
 else:
   st.title("🚗 TAPAT Parking Management System")
 
-# --- SIDEBAR NAVIGATION (NOW 3 TABS) ---
+# Navigation Menu
 st.sidebar.title("Navigation & Settings")
 menu = st.sidebar.radio(
     "Go to",
-    ["Log Parking Counts", "View Weekly Report", "Service Summary (Tab 3)"],
+    ["Log Parking Counts", "View Weekly Report", "Summary Dashboard"],
 )
 
 df = load_data()
 
-# --- APP CUSTOMIZATION SIDEBAR ---
+# App Customization
 with st.sidebar.expander("⚙️ App Customization"):
   custom_banner = st.file_uploader(
       "Upload Header Banner Image", type=["png", "jpg", "jpeg"]
@@ -133,15 +131,13 @@ with st.sidebar.expander("⚙️ App Customization"):
     banner_img.save(HEADER_BANNER_PATH)
     st.success("Header banner updated! Refresh page.")
 
-
 # --- TAB 1: LOG PARKING COUNTS ---
 if menu == "Log Parking Counts":
-  st.header("Church of God Dasmarinas Parking Tracker")
+  st.header("Church of God Dasmarinas")
 
   selected_location = st.selectbox(
       "Select Church Location:", list(LOCATION_CONFIG.keys())
   )
-
   active_services = LOCATION_CONFIG[selected_location]["services"]
   active_parking_areas = LOCATION_CONFIG[selected_location]["areas"]
 
@@ -150,14 +146,9 @@ if menu == "Log Parking Counts":
 
   st.markdown("---")
   st.subheader(f"Input Counts for: {selected_location}")
-  st.caption(
-      "Enter the number of Cars and Motorcycles for each area during this"
-      " service."
-  )
 
   with st.form("table_entry_form"):
     counts_data = {}
-
     for area in active_parking_areas:
       st.markdown(f"**📍 {area}**")
       col1, col2 = st.columns(2)
@@ -174,16 +165,13 @@ if menu == "Log Parking Counts":
             key=f"motor_{area}",
         )
       counts_data[area] = {"cars": cars, "motors": motors}
-      st.markdown("")
 
     st.markdown("---")
-    st.subheader("📷 Attach Verification Photo (Optional)")
     uploaded_file = st.file_uploader(
-        "Choose an image file or take a photo", type=["png", "jpg", "jpeg"]
+        "📷 Attach Verification Photo (Optional)", type=["png", "jpg", "jpeg"]
     )
-
     submit_button = st.form_submit_button(
-        label="💾 Save Counts & Upload Photo", use_container_width=True
+        label="💾 Save Counts", use_container_width=True
     )
 
     if submit_button:
@@ -212,23 +200,18 @@ if menu == "Log Parking Counts":
         })
 
       new_df = pd.DataFrame(new_entries)
-
       try:
         df = load_data()
         df = pd.concat([df, new_df], ignore_index=True)
         df.to_csv(FILENAME, index=False)
         st.cache_data.clear()
-        st.success(
-            f"Successfully saved counts for {selected_location} -"
-            f" {selected_service}!"
-        )
+        st.success("Successfully saved counts!")
       except Exception as e:
         st.error(f"Error saving data: {e}")
 
 # --- TAB 2: VIEW WEEKLY REPORT ---
 elif menu == "View Weekly Report":
   st.header("📊 Weekly Summary Report")
-
   if df.empty:
     st.info("No parking logs found yet.")
   else:
@@ -239,7 +222,6 @@ elif menu == "View Weekly Report":
         max_value=53,
         value=int(current_week),
     )
-
     filtered_df = df[df["Week_Number"] == selected_week]
 
     if filtered_df.empty:
@@ -249,21 +231,13 @@ elif menu == "View Weekly Report":
           "Filter Report by Location:",
           ["All Locations"] + list(LOCATION_CONFIG.keys()),
       )
-
       if report_location != "All Locations":
         filtered_df = filtered_df[filtered_df["Location"] == report_location]
 
-      if filtered_df.empty:
-        st.warning(
-            f"No records found for {report_location} in Week {selected_week}."
-        )
-      else:
+      if not filtered_df.empty:
         filtered_df["Total_Vehicles"] = (
             filtered_df["Car_Count"] + filtered_df["Motorcycle_Count"]
         )
-
-        st.subheader(f"Summary Breakdown for Week {selected_week}")
-
         summary_table = (
             filtered_df.groupby(["Location", "Parking_Area"])[
                 ["Car_Count", "Motorcycle_Count", "Total_Vehicles"]
@@ -288,27 +262,7 @@ elif menu == "View Weekly Report":
             "Motorcycles",
             "Total Vehicles",
         ]
-
         st.dataframe(summary_table, use_container_width=True)
-
-        total_cars = filtered_df["Car_Count"].sum()
-        total_motors = filtered_df["Motorcycle_Count"].sum()
-        grand_total = filtered_df["Total_Vehicles"].sum()
-
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Cars", total_cars)
-        col2.metric("Total Motorcycles", total_motors)
-        col3.metric("Combined Grand Total", grand_total)
-
-        csv_data = summary_table.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="📥 Download Weekly Report (CSV)",
-            data=csv_data,
-            file_name=(
-                f"tapat_weekly_report_week_{selected_week}_{report_location.replace(' ', '_')}.csv"
-            ),
-            mime="text/csv",
-        )
 
 # --- TAB 3: EXECUTIVE DASHBOARD ---
 elif menu == "Dashboard (Tab 3)":
