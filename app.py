@@ -310,60 +310,102 @@ elif menu == "View Weekly Report":
             mime="text/csv",
         )
 
-# --- TAB 3: SERVICE SUMMARY ---
-elif menu == "Service Summary (Tab 3)":
-  st.header("📋 Service-by-Service Summary")
-  st.caption("View totals grouped by service and location for any given week.")
+# --- TAB 3: EXECUTIVE DASHBOARD ---
+elif menu == "Dashboard (Tab 3)":
+  st.header("📈 TAPAT Executive Parking Dashboard")
+  st.caption(
+      "Comprehensive weekly traffic metrics and location breakdowns for"
+      " leadership."
+  )
 
   if df.empty:
     st.info("No parking logs found yet.")
   else:
+    col_week, col_loc = st.columns(2)
+
     current_week = datetime.now().isocalendar()[1]
-    selected_week = st.number_input(
-        "Select Week Number for Summary:",
-        min_value=1,
-        max_value=53,
-        value=int(current_week),
-        key="tab3_week",
-    )
+    with col_week:
+      selected_week = st.number_input(
+          "Select Dashboard Week:",
+          min_value=1,
+          max_value=53,
+          value=int(current_week),
+          key="dash_week",
+      )
+
+    with col_loc:
+      selected_dash_loc = st.selectbox(
+          "Filter Dashboard Location:",
+          ["All Locations"] + list(LOCATION_CONFIG.keys()),
+          key="dash_loc_filter",
+      )
 
     week_df = df[df["Week_Number"] == selected_week]
 
     if week_df.empty:
-      st.warning(f"No records found for Week {selected_week}.")
+      st.warning(f"No parking data recorded for Week {selected_week}.")
     else:
-      # Loop through each location configured
-      for location_name in LOCATION_CONFIG.keys():
-        loc_df = week_df[week_df["Location"] == location_name]
+      # Filter by location if specified
+      if selected_dash_loc != "All Locations":
+        filtered_dash_df = week_df[week_df["Location"] == selected_dash_loc]
+      else:
+        filtered_dash_df = week_df
 
-        if not loc_df.empty:
-          st.markdown(f"### 📍 {location_name}")
+      if filtered_dash_df.empty:
+        st.warning(
+            f"No records logged for {selected_dash_loc} in Week {selected_week}."
+        )
+      else:
+        # Calculate Grand Totals Across All Included Locations
+        total_cars_all = filtered_dash_df["Car_Count"].sum()
+        total_motors_all = filtered_dash_df["Motorcycle_Count"].sum()
+        grand_total_vehicles = total_cars_all + total_motors_all
 
-          # Group by Service
-          service_grouped = (
-              loc_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
-              .sum()
-              .reset_index()
-          )
+        # --- TOP LEVEL DASHBOARD METRICS ---
+        st.markdown("---")
+        st.subheader("🌐 Overall Ministry Grand Totals")
 
-          loc_total_cars = 0
-          loc_total_motors = 0
+        col1, col2, col3 = st.columns(3)
+        col1.metric("🚘 Grand Total Cars", f"{total_cars_all:,}")
+        col2.metric("🛵 Grand Total Motorcycles", f"{total_motors_all:,}")
+        col3.metric("🚘+🛵 Overall Vehicles Total", f"{grand_total_vehicles:,}")
 
-          for _, row in service_grouped.iterrows():
-            svc = row["Service"]
-            cars = int(row["Car_Count"])
-            motors = int(row["Motorcycle_Count"])
+        st.markdown("---")
 
-            loc_total_cars += cars
-            loc_total_motors += motors
+        # --- BREAKDOWN PER LOCATION & SERVICE ---
+        if selected_dash_loc == "All Locations":
+          target_locations = list(LOCATION_CONFIG.keys())
+        else:
+          target_locations = [selected_dash_loc]
 
-            # Display exactly in your requested format
-            st.markdown(f"- **{svc}:** {cars} Cars, {motors} Motorcycles")
+        for loc in target_locations:
+          loc_df = week_df[week_df["Location"] == loc]
 
-          # Location Combined Total
-          comb_total = loc_total_cars + loc_total_motors
-          st.markdown(
-              f"**Total:** {loc_total_cars} Cars, {loc_total_motors}"
-              f" Motorcycles *(Combined Grand Total: {comb_total}*)"
-          )
-          st.markdown("---")
+          if not loc_df.empty:
+            st.markdown(f"### 📍 {loc}")
+
+            service_grouped = (
+                loc_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
+                .sum()
+                .reset_index()
+            )
+
+            loc_cars = 0
+            loc_motors = 0
+
+            # List services formatted neatly
+            for _, row in service_grouped.iterrows():
+              svc = row["Service"]
+              c = int(row["Car_Count"])
+              m = int(row["Motorcycle_Count"])
+              loc_cars += c
+              loc_motors += m
+
+              st.write(f"• **{svc}:** {c:,} Cars | {m:,} Motorcycles")
+
+            loc_combined = loc_cars + loc_motors
+            st.info(
+                f"**{loc} Subtotal:** {loc_cars:,} Cars + {loc_motors:,}"
+                f" Motorcycles = **{loc_combined:,} Total Vehicles**"
+            )
+            st.markdown("")
