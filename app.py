@@ -364,9 +364,3 @@ elif menu == "View Weekly Report":
 
         total_cars = filtered_df["Car_Count"].sum()
         total_motors = filtered_df["Motorcycle_Count"].sum()
-        grand_total = filtered_df["Total_Vehicles"].sum()
-
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Cars", total_cars)
-        col2.metric("Total Motorcycles", total_motors)
-        col3.metric("Combined Grand Total", grand_
