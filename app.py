@@ -26,6 +26,7 @@ LOCATION_CONFIG = {
             "Parking 8",
             "Parking 9",
             "Parking 10",
+            "Basement",
         ],
         "services": [
             "1st Service",
