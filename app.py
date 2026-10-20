@@ -434,7 +434,7 @@ elif menu == "View Weekly Report":
 
 # --- TAB 3: SUMMARY DASHBOARD ---
 elif menu == "Summary Dashboard":
-  st.header("📈 Weekly Parking Leadership Dashboard")
+  st.header("📈 Weekly Parking Report")
   st.caption(
       "Executive overview of service-by-service vehicle counts and location"
       " subtotals."
