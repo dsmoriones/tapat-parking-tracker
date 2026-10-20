@@ -539,4 +539,48 @@ elif menu == "Summary Dashboard":
               service_grouped = service_grouped.sort_values("Service")
 
               loc_cars = 0
-              loc_motors =
+              loc_motors = 0
+
+              for _, row in service_grouped.iterrows():
+                svc = row["Service"]
+                c = int(row["Car_Count"])
+                m = int(row["Motorcycle_Count"])
+                tot = c + m
+                loc_cars += c
+                loc_motors += m
+
+                st.write(
+                    f"• **{svc}:** {c:,} Cars | {m:,} Motorcycles *(Total:"
+                    f" {tot:,})*"
+                )
+
+              loc_combined = loc_cars + loc_motors
+              st.success(
+                  f"**{loc} Subtotal:** {loc_cars:,} Cars + {loc_motors:,}"
+                  f" Motorcycles = **{loc_combined:,} Total Vehicles**"
+              )
+
+# --- SECRET TAB 4: DATA VERIFICATION (ADMIN ONLY) ---
+elif menu == "Data Verification" and getattr(
+    st.session_state, "is_admin", False
+):
+  st.header("🔒 Admin Data Verification Log")
+  st.caption(
+      "Clean single-line entries showing timestamps, locations, and total"
+      " vehicle counts."
+  )
+
+  df_verify = load_data()
+
+  if df_verify.empty:
+    st.info("No parking log entries found.")
+  else:
+    st.markdown("---")
+
+    grouped_entries = (
+        df_verify.groupby(["Timestamp", "Date", "Location", "Service"])[
+            ["Car_Count", "Motorcycle_Count"]
+        ]
+        .sum()
+        .reset_index()
+    )
