@@ -115,30 +115,34 @@ st.set_page_config(
     page_title="TAPAT Parking Tracker", page_icon="🚗", layout="centered"
 )
 
-# --- MODERN UI STYLING & CSS INJECTION ---
+# --- MODERN UI STYLING & CSS INJECTION (FIXED FOR DARK MODE) ---
 st.markdown(
     """
     <style>
-        /* Global background and card styling */
-        .stMetric {
-            background-color: #f8f9fa;
+        /* Theme-aware metric card styling */
+        [data-testid="stMetric"] {
+            background-color: var(--background-secondary-color, #f8f9fa);
             padding: 15px;
             border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-            border: 1px solid #e9ecef;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: 1px solid var(--border-color, #e9ecef);
         }
+        
+        /* Ensure metric text remains readable */
+        [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
+            color: var(--text-color, #1e293b) !important;
+        }
+
         /* Style headers */
         h1, h2, h3 {
-            color: #1e293b;
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         }
+
         /* Custom containers */
         div[data-testid="stVerticalBlock"] > div[style*="border"] {
             border-radius: 12px;
-            border: 1px solid #e2e8f0;
             padding: 15px;
-            background-color: #ffffff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.01);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
     </style>
 """,
@@ -584,3 +588,32 @@ elif menu == "Data Verification" and getattr(
         .sum()
         .reset_index()
     )
+
+    for idx, row in grouped_entries.iloc[::-1].iterrows():
+      ts = row["Timestamp"]
+      dt = row["Date"]
+      loc = row["Location"]
+      svc = row["Service"]
+      cars = int(row["Car_Count"])
+      motors = int(row["Motorcycle_Count"])
+      tot = cars + motors
+
+      col_text, col_btn = st.columns([5, 1])
+
+      with col_text:
+        st.markdown(
+            f"🕒 **`{ts}`** | 📍 **{loc}** ({svc}) — Date: `{dt}` | 🚘"
+            f" `{cars}` Cars | 🛵 `{motors}` Motors | **Total: {tot}**"
+        )
+
+      with col_btn:
+        if st.button("🗑️ Delete", key=f"del_submission_{idx}"):
+          df_verify = df_verify[df_verify["Timestamp"] != ts].reset_index(
+              drop=True
+          )
+          df_verify.to_csv(FILENAME, index=False)
+          st.cache_data.clear()
+          st.success("Deleted submission entry!")
+          st.rerun()
+
+      st.markdown("---")
