@@ -121,12 +121,26 @@ if os.path.exists(HEADER_BANNER_PATH):
 else:
   st.title("🚗 TAPAT PARKING MANAGEMENT SYSTEM 🚗")
 
+# --- ADMIN AUTHENTICATION FOR SECRET TAB ---
+# Change "tapat_admin_2026" to any secret password you prefer!
+ADMIN_PASSWORD = "tapat_admin_2026"
+
+if "is_admin" not in st.session_state:
+  st.session_state.is_admin = False
+
 # Sidebar navigation & settings
 st.sidebar.title("Navigation & Settings")
-menu = st.sidebar.radio(
-    "Go to",
-    ["Log Parking Counts", "View Weekly Report", "Summary Dashboard"],
-)
+
+# Build navigation options dynamically based on admin status
+nav_options = [
+    "Log Parking Counts",
+    "View Weekly Report",
+    "Summary Dashboard",
+]
+if st.session_state.is_admin:
+  nav_options.append("Data Verification")
+
+menu = st.sidebar.radio("Go to", nav_options)
 
 with st.sidebar.expander("⚙️ App Customization"):
   custom_banner = st.file_uploader(
@@ -143,6 +157,22 @@ with st.sidebar.expander("⚙️ App Customization"):
       os.remove(FILENAME)
       st.cache_data.clear()
       st.success("All logs cleared successfully!")
+      st.rerun()
+
+  # Hidden Admin Login gate inside expander
+  st.markdown("---")
+  if not st.session_state.is_admin:
+    entered_pass = st.text_input("Admin Unlock", type="password")
+    if st.button("Unlock Verification Tab"):
+      if entered_pass == ADMIN_PASSWORD:
+        st.session_state.is_admin = True
+        st.success("Unlocked!")
+        st.rerun()
+      else:
+        st.error("Incorrect password.")
+  else:
+    if st.button("Lock Admin Access"):
+      st.session_state.is_admin = False
       st.rerun()
 
 # --- TAB 1: LOG PARKING COUNTS ---
@@ -467,3 +497,55 @@ elif menu == "Summary Dashboard":
                 f" Motorcycles = **{loc_combined:,} Total Vehicles**"
             )
             st.markdown("")
+
+# --- SECRET TAB 4: DATA VERIFICATION (ADMIN ONLY) ---
+elif menu == "Data Verification" and st.session_state.is_admin:
+  st.header("🔒 Admin Data Verification & Audit")
+  st.caption(
+      "Inspect individual row inputs, timestamps, and delete isolated entries"
+      " if needed."
+  )
+
+  df_verify = load_data()
+
+  if df_verify.empty:
+    st.info("No parking log entries found.")
+  else:
+    st.write(f"Total individual rows in database: **{len(df_verify)}**")
+
+    # Display full table with indices for reference
+    st.dataframe(df_verify, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("🗑️ Single Entry Deletion Tool")
+
+    # Create detailed row identifiers showing index, timestamp, location, service, and area
+    df_verify["Audit_Label"] = (
+        df_verify.index.astype(str)
+        + " | Time: "
+        + df_verify["Timestamp"].astype(str)
+        + " | "
+        + df_verify["Location"].astype(str)
+        + " - "
+        + df_verify["Service"].astype(str)
+        + " ("
+        + df_verify["Parking_Area"].astype(str)
+        + ")"
+    )
+
+    selected_audit_row = st.selectbox(
+        "Select specific input row to delete:", df_verify["Audit_Label"]
+    )
+
+    if st.button("🗑️ Delete Selected Row", type="primary"):
+      row_idx = int(selected_audit_row.split(" | ")[0])
+      df_verify = df_verify.drop(row_idx).reset_index(drop=True)
+
+      # Drop helper column before saving back
+      if "Audit_Label" in df_verify.columns:
+        df_verify = df_verify.drop(columns=["Audit_Label"])
+
+      df_verify.to_csv(FILENAME, index=False)
+      st.cache_data.clear()
+      st.success(f"Successfully deleted row index {row_idx}!")
+      st.rerun()
