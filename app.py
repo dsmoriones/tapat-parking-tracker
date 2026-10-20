@@ -503,7 +503,7 @@ elif menu == "Summary Dashboard":
         grand_total_vehicles = total_cars_all + total_motors_all
 
         st.markdown("---")
-        st.subheader("🌐 Ministry Overall Summary")
+        st.subheader("🌐 Overall Summary")
 
         # Visually appealing card metrics
         c1, c2, c3 = st.columns(3)
