@@ -115,62 +115,109 @@ st.set_page_config(
     page_title="TAPAT Parking Tracker", page_icon="🚗", layout="centered"
 )
 
+# --- MODERN UI STYLING & CSS INJECTION ---
+st.markdown(
+    """
+    <style>
+        /* Global background and card styling */
+        .stMetric {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            border: 1px solid #e9ecef;
+        }
+        /* Style headers */
+        h1, h2, h3 {
+            color: #1e293b;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        /* Custom containers */
+        div[data-testid="stVerticalBlock"] > div[style*="border"] {
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            padding: 15px;
+            background-color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.01);
+        }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
+# --- LEADERSHIP VIEW URL DETECTION ---
+query_params = st.query_params
+is_leadership_view = query_params.get("view") in ["leadership", "summary"]
+
+if is_leadership_view:
+  # Hide sidebar entirely for leadership link view
+  st.markdown(
+      """
+        <style>
+            [data-testid="stSidebar"] {display: none;}
+            [data-testid="collapsedControl"] {display: none;}
+        </style>
+    """,
+      unsafe_allow_html=True,
+  )
+  menu = "Summary Dashboard"
+else:
+  # --- ADMIN AUTHENTICATION FOR SECRET TAB ---
+  ADMIN_PASSWORD = "tapat_admin_2026"
+
+  if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+
+  # Sidebar navigation & settings
+  st.sidebar.title("Navigation & Settings")
+
+  nav_options = [
+      "Log Parking Counts",
+      "View Weekly Report",
+      "Summary Dashboard",
+  ]
+  if st.session_state.is_admin:
+    nav_options.append("Data Verification")
+
+  menu = st.sidebar.radio("Go to", nav_options)
+
+  with st.sidebar.expander("⚙️ App Customization"):
+    custom_banner = st.file_uploader(
+        "Upload Header Banner Image", type=["png", "jpg", "jpeg"]
+    )
+    if custom_banner is not None:
+      banner_img = Image.open(custom_banner)
+      banner_img.save(HEADER_BANNER_PATH)
+      st.success("Header banner updated! Refresh the page to see it.")
+
+    st.markdown("---")
+    if st.button("🗑️ Clear All Logged Data"):
+      if os.path.exists(FILENAME):
+        os.remove(FILENAME)
+        st.cache_data.clear()
+        st.success("All logs cleared successfully!")
+        st.rerun()
+
+    st.markdown("---")
+    if not st.session_state.is_admin:
+      entered_pass = st.text_input("Admin Unlock", type="password")
+      if st.button("Unlock Verification Tab"):
+        if entered_pass == ADMIN_PASSWORD:
+          st.session_state.is_admin = True
+          st.success("Unlocked!")
+          st.rerun()
+        else:
+          st.error("Incorrect password.")
+    else:
+      if st.button("Lock Admin Access"):
+        st.session_state.is_admin = False
+        st.rerun()
+
 # --- HEADER IMAGE SECTION ---
 if os.path.exists(HEADER_BANNER_PATH):
   st.image(HEADER_BANNER_PATH, use_container_width=True)
 else:
   st.title("🚗 TAPAT PARKING MANAGEMENT SYSTEM 🚗")
-
-# --- ADMIN AUTHENTICATION FOR SECRET TAB ---
-ADMIN_PASSWORD = "tapat_admin_2026"
-
-if "is_admin" not in st.session_state:
-  st.session_state.is_admin = False
-
-# Sidebar navigation & settings
-st.sidebar.title("Navigation & Settings")
-
-nav_options = [
-    "Log Parking Counts",
-    "View Weekly Report",
-    "Summary Dashboard",
-]
-if st.session_state.is_admin:
-  nav_options.append("Data Verification")
-
-menu = st.sidebar.radio("Go to", nav_options)
-
-with st.sidebar.expander("⚙️ App Customization"):
-  custom_banner = st.file_uploader(
-      "Upload Header Banner Image", type=["png", "jpg", "jpeg"]
-  )
-  if custom_banner is not None:
-    banner_img = Image.open(custom_banner)
-    banner_img.save(HEADER_BANNER_PATH)
-    st.success("Header banner updated! Refresh the page to see it.")
-
-  st.markdown("---")
-  if st.button("🗑️ Clear All Logged Data"):
-    if os.path.exists(FILENAME):
-      os.remove(FILENAME)
-      st.cache_data.clear()
-      st.success("All logs cleared successfully!")
-      st.rerun()
-
-  st.markdown("---")
-  if not st.session_state.is_admin:
-    entered_pass = st.text_input("Admin Unlock", type="password")
-    if st.button("Unlock Verification Tab"):
-      if entered_pass == ADMIN_PASSWORD:
-        st.session_state.is_admin = True
-        st.success("Unlocked!")
-        st.rerun()
-      else:
-        st.error("Incorrect password.")
-  else:
-    if st.button("Lock Admin Access"):
-      st.session_state.is_admin = False
-      st.rerun()
 
 # --- TAB 1: LOG PARKING COUNTS ---
 if menu == "Log Parking Counts":
@@ -383,8 +430,23 @@ elif menu == "View Weekly Report":
 
 # --- TAB 3: SUMMARY DASHBOARD ---
 elif menu == "Summary Dashboard":
-  st.header("📈 Weekly Parking Report")
-  st.caption("Service-by-service vehicle counts and location subtotals.")
+  st.header("📈 Weekly Parking Leadership Dashboard")
+  st.caption(
+      "Executive overview of service-by-service vehicle counts and location"
+      " subtotals."
+  )
+
+  # Share link helper box for Marshals (hidden when viewed via leadership link)
+  if not is_leadership_view:
+    with st.expander("🔗 Share Leadership Link"):
+      st.info(
+          "Send this direct link to church leadership so they can view only the"
+          " clean summary dashboard:"
+      )
+      st.code(
+          "https://tapat-parking-tracker.streamlit.app/?view=leadership",
+          language="text",
+      )
 
   df = load_data()
 
@@ -437,12 +499,16 @@ elif menu == "Summary Dashboard":
         grand_total_vehicles = total_cars_all + total_motors_all
 
         st.markdown("---")
-        st.subheader("🌐 Ministry Overall Totals")
+        st.subheader("🌐 Ministry Overall Summary")
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric("🚘 Total Cars", f"{total_cars_all:,}")
-        col2.metric("🛵 Total Motorcycles", f"{total_motors_all:,}")
-        col3.metric("🚘+🛵 Total Vehicles", f"{grand_total_vehicles:,}")
+        # Visually appealing card metrics
+        c1, c2, c3 = st.columns(3)
+        with c1:
+          st.metric("🚘 Total Cars", f"{total_cars_all:,}")
+        with c2:
+          st.metric("🛵 Total Motorcycles", f"{total_motors_all:,}")
+        with c3:
+          st.metric("📊 Grand Total Vehicles", f"{grand_total_vehicles:,}")
 
         st.markdown("---")
 
@@ -455,93 +521,22 @@ elif menu == "Summary Dashboard":
           loc_df = week_df[week_df["Location"] == loc]
 
           if not loc_df.empty:
-            st.markdown(f"### 📍 {loc}")
+            with st.container(border=True):
+              st.markdown(f"### 📍 {loc}")
 
-            service_grouped = (
-                loc_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
-                .sum()
-                .reset_index()
-            )
-
-            config_services = LOCATION_CONFIG[loc]["services"]
-            service_grouped["Service"] = pd.Categorical(
-                service_grouped["Service"],
-                categories=config_services,
-                ordered=True,
-            )
-            service_grouped = service_grouped.sort_values("Service")
-
-            loc_cars = 0
-            loc_motors = 0
-
-            for _, row in service_grouped.iterrows():
-              svc = row["Service"]
-              c = int(row["Car_Count"])
-              m = int(row["Motorcycle_Count"])
-              tot = c + m
-              loc_cars += c
-              loc_motors += m
-
-              st.write(
-                  f"• **{svc}:** {c:,} Cars | {m:,} Motorcycles *(Total:"
-                  f" {tot:,})*"
+              service_grouped = (
+                  loc_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
+                  .sum()
+                  .reset_index()
               )
 
-            loc_combined = loc_cars + loc_motors
-            st.info(
-                f"**{loc} Subtotal:** {loc_cars:,} Cars + {loc_motors:,}"
-                f" Motorcycles = **{loc_combined:,} Total Vehicles**"
-            )
-            st.markdown("")
+              config_services = LOCATION_CONFIG[loc]["services"]
+              service_grouped["Service"] = pd.Categorical(
+                  service_grouped["Service"],
+                  categories=config_services,
+                  ordered=True,
+              )
+              service_grouped = service_grouped.sort_values("Service")
 
-# --- SECRET TAB 4: DATA VERIFICATION (ADMIN ONLY - SINGLE ENTRY LINE LOG) ---
-elif menu == "Data Verification" and st.session_state.is_admin:
-  st.header("🔒 Admin Data Verification Log")
-  st.caption(
-      "Clean single-line entries showing timestamps, locations, and total"
-      " vehicle counts."
-  )
-
-  df_verify = load_data()
-
-  if df_verify.empty:
-    st.info("No parking log entries found.")
-  else:
-    st.markdown("---")
-
-    grouped_entries = (
-        df_verify.groupby(["Timestamp", "Date", "Location", "Service"])[
-            ["Car_Count", "Motorcycle_Count"]
-        ]
-        .sum()
-        .reset_index()
-    )
-
-    for idx, row in grouped_entries.iloc[::-1].iterrows():
-      ts = row["Timestamp"]
-      dt = row["Date"]
-      loc = row["Location"]
-      svc = row["Service"]
-      cars = int(row["Car_Count"])
-      motors = int(row["Motorcycle_Count"])
-      tot = cars + motors
-
-      col_text, col_btn = st.columns([5, 1])
-
-      with col_text:
-        st.markdown(
-            f"🕒 **`{ts}`** | 📍 **{loc}** ({svc}) — Date: `{dt}` | 🚘"
-            f" `{cars}` Cars | 🛵 `{motors}` Motors | **Total: {tot}**"
-        )
-
-      with col_btn:
-        if st.button("🗑️ Delete", key=f"del_submission_{idx}"):
-          df_verify = df_verify[df_verify["Timestamp"] != ts].reset_index(
-              drop=True
-          )
-          df_verify.to_csv(FILENAME, index=False)
-          st.cache_data.clear()
-          st.success("Deleted submission entry!")
-          st.rerun()
-
-      st.markdown("---")
+              loc_cars = 0
+              loc_motors =
