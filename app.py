@@ -122,7 +122,6 @@ else:
   st.title("🚗 TAPAT PARKING MANAGEMENT SYSTEM 🚗")
 
 # --- ADMIN AUTHENTICATION FOR SECRET TAB ---
-# Change "tapat_admin_2026" to any secret password you prefer!
 ADMIN_PASSWORD = "tapat_admin_2026"
 
 if "is_admin" not in st.session_state:
@@ -131,7 +130,6 @@ if "is_admin" not in st.session_state:
 # Sidebar navigation & settings
 st.sidebar.title("Navigation & Settings")
 
-# Build navigation options dynamically based on admin status
 nav_options = [
     "Log Parking Counts",
     "View Weekly Report",
@@ -159,7 +157,6 @@ with st.sidebar.expander("⚙️ App Customization"):
       st.success("All logs cleared successfully!")
       st.rerun()
 
-  # Hidden Admin Login gate inside expander
   st.markdown("---")
   if not st.session_state.is_admin:
     entered_pass = st.text_input("Admin Unlock", type="password")
@@ -230,7 +227,6 @@ if menu == "Log Parking Counts":
     if submit_button:
       now = datetime.now()
 
-      # Sunday Adjustment Logic
       if log_date.weekday() == 6:
         calc_date = log_date - timedelta(days=1)
       else:
@@ -498,54 +494,46 @@ elif menu == "Summary Dashboard":
             )
             st.markdown("")
 
-# --- SECRET TAB 4: DATA VERIFICATION (ADMIN ONLY) ---
+# --- SECRET TAB 4: DATA VERIFICATION (ADMIN ONLY - SIMPLE LOG LIST) ---
 elif menu == "Data Verification" and st.session_state.is_admin:
-  st.header("🔒 Admin Data Verification & Audit")
-  st.caption(
-      "Inspect individual row inputs, timestamps, and delete isolated entries"
-      " if needed."
-  )
+  st.header("🔒 Admin Data Verification Log")
+  st.caption("Review individual submissions and delete items row by row.")
 
   df_verify = load_data()
 
   if df_verify.empty:
     st.info("No parking log entries found.")
   else:
-    st.write(f"Total individual rows in database: **{len(df_verify)}**")
-
-    # Display full table with indices for reference
-    st.dataframe(df_verify, use_container_width=True)
-
     st.markdown("---")
-    st.subheader("🗑️ Single Entry Deletion Tool")
 
-    # Create detailed row identifiers showing index, timestamp, location, service, and area
-    df_verify["Audit_Label"] = (
-        df_verify.index.astype(str)
-        + " | Time: "
-        + df_verify["Timestamp"].astype(str)
-        + " | "
-        + df_verify["Location"].astype(str)
-        + " - "
-        + df_verify["Service"].astype(str)
-        + " ("
-        + df_verify["Parking_Area"].astype(str)
-        + ")"
-    )
+    # Loop through each row in reverse order (newest submissions at the top)
+    for idx, row in df_verify.iloc[::-1].iterrows():
+      timestamp = row["Timestamp"]
+      date_logged = row["Date"]
+      location = row["Location"]
+      service = row["Service"]
+      area = row["Parking_Area"]
+      cars = row["Car_Count"]
+      motors = row["Motorcycle_Count"]
 
-    selected_audit_row = st.selectbox(
-        "Select specific input row to delete:", df_verify["Audit_Label"]
-    )
+      # Clean, simple card layout for each entry log
+      with st.container():
+        col_info, col_btn = st.columns([4, 1])
 
-    if st.button("🗑️ Delete Selected Row", type="primary"):
-      row_idx = int(selected_audit_row.split(" | ")[0])
-      df_verify = df_verify.drop(row_idx).reset_index(drop=True)
+        with col_info:
+          st.markdown(
+              f"**🕒 {timestamp}** — *Date: {date_logged}*"
+              f"\n\n📍 **{location}** | {service} | **{area}**"
+              f"\n\n🚘 Cars: `{cars}` | 🛵 Motorcycles: `{motors}`"
+          )
 
-      # Drop helper column before saving back
-      if "Audit_Label" in df_verify.columns:
-        df_verify = df_verify.drop(columns=["Audit_Label"])
+        with col_btn:
+          st.markdown("")  # Spacing alignment
+          if st.button("🗑️ Delete", key=f"del_row_{idx}", type="secondary"):
+            df_verify = df_verify.drop(idx).reset_index(drop=True)
+            df_verify.to_csv(FILENAME, index=False)
+            st.cache_data.clear()
+            st.success(f"Deleted entry #{idx} successfully!")
+            st.rerun()
 
-      df_verify.to_csv(FILENAME, index=False)
-      st.cache_data.clear()
-      st.success(f"Successfully deleted row index {row_idx}!")
-      st.rerun()
+        st.markdown("---")
