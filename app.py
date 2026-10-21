@@ -4,15 +4,23 @@ import pandas as pd
 from PIL import Image
 import streamlit as st
 
+# Optional cloud storage integration via streamlit-gsheets
+try:
+  from streamlit_gsheets import GSheetsConnection
+
+  HAS_GSHEETS = True
+except ImportError:
+  HAS_GSHEETS = False
+
 FILENAME = "tapat_parking_logs.csv"
 IMAGE_DIR = "uploaded_photos"
 HEADER_BANNER_PATH = "tapat_banner.png"
 
-# Ensure directories exist
+# Ensure local storage directory exists for uploaded images
 if not os.path.exists(IMAGE_DIR):
   os.makedirs(IMAGE_DIR)
 
-# Define Church Locations with their own specific Parking Areas AND Services
+# Define Church Locations with their specific Parking Areas AND Services
 LOCATION_CONFIG = {
     "COG Dasma - Main": {
         "areas": [
@@ -43,9 +51,7 @@ LOCATION_CONFIG = {
         ],
     },
     "COG Jabez": {
-        "areas": [
-            "Open Parking",
-        ],
+        "areas": ["Open Parking"],
         "services": [
             "1st Service",
             "2nd Service",
@@ -55,10 +61,7 @@ LOCATION_CONFIG = {
         ],
     },
     "COG Trece": {
-        "areas": [
-            "Main Parking",
-            "BIR",
-        ],
+        "areas": ["Main Parking", "BIR"],
         "services": [
             "1st Service",
             "2nd Service",
@@ -70,9 +73,7 @@ LOCATION_CONFIG = {
         ],
     },
     "COG Silang": {
-        "areas": [
-            "Main Parking",
-        ],
+        "areas": ["Main Parking"],
         "services": [
             "1st Service",
             "2nd Service",
@@ -83,18 +84,34 @@ LOCATION_CONFIG = {
         ],
     },
     "Palmas Resort": {
-        "areas": [
-            "Main Parking",
-        ],
-        "services": [
-            "Whole Day",
-        ],
+        "areas": ["Main Parking"],
+        "services": ["Whole Day"],
     },
 }
 
 
-@st.cache_data
+# --- DATA STORAGE FUNCTIONS (Google Sheets with CSV Fallback) ---
+def get_connection():
+  if HAS_GSHEETS:
+    try:
+      return st.connection("gsheets", type=GSheetsConnection)
+    except Exception:
+      return None
+  return None
+
+
+@st.cache_data(ttl=5)
 def load_data():
+  conn = get_connection()
+  if conn is not None:
+    try:
+      df = conn.read(ttl="0d")
+      if not df.empty:
+        return df
+    except Exception:
+      pass
+
+  # Fallback to local CSV
   try:
     return pd.read_csv(FILENAME)
   except FileNotFoundError:
@@ -111,15 +128,39 @@ def load_data():
     ])
 
 
+def save_data(new_entries_df):
+  # 1. Save to Google Sheets if connected
+  conn = get_connection()
+  if conn is not None:
+    try:
+      existing_df = conn.read(ttl="0d")
+      updated_df = pd.concat([existing_df, new_entries_df], ignore_index=True)
+      conn.update(data=updated_df)
+    except Exception as e:
+      st.warning(
+          f"Google Sheets update failed: {e}. Saving to local backup CSV."
+      )
+
+  # 2. Always maintain local CSV backup
+  try:
+    if os.path.exists(FILENAME):
+      df = pd.read_csv(FILENAME)
+      df = pd.concat([df, new_entries_df], ignore_index=True)
+    else:
+      df = new_entries_df
+    df.to_csv(FILENAME, index=False)
+  except Exception as e:
+    st.error(f"Error saving to local CSV: {e}")
+
+
 st.set_page_config(
     page_title="TAPAT Parking Tracker", page_icon="🚗", layout="centered"
 )
 
-# --- MODERN UI STYLING & CSS INJECTION (FIXED FOR DARK MODE) ---
+# --- MODERN UI STYLING & CSS INJECTION (DARK MODE FIXED) ---
 st.markdown(
     """
     <style>
-        /* Theme-aware metric card styling */
         [data-testid="stMetric"] {
             background-color: var(--background-secondary-color, #f8f9fa);
             padding: 15px;
@@ -127,18 +168,12 @@ st.markdown(
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             border: 1px solid var(--border-color, #e9ecef);
         }
-        
-        /* Ensure metric text remains readable */
         [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
             color: var(--text-color, #1e293b) !important;
         }
-
-        /* Style headers */
         h1, h2, h3 {
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         }
-
-        /* Custom containers */
         div[data-testid="stVerticalBlock"] > div[style*="border"] {
             border-radius: 12px;
             padding: 15px;
@@ -154,7 +189,6 @@ query_params = st.query_params
 is_leadership_view = query_params.get("view") in ["leadership", "summary"]
 
 if is_leadership_view:
-  # Hide sidebar entirely for leadership link view
   st.markdown(
       """
         <style>
@@ -166,13 +200,11 @@ if is_leadership_view:
   )
   menu = "Summary Dashboard"
 else:
-  # --- ADMIN AUTHENTICATION FOR SECRET TAB ---
   ADMIN_PASSWORD = "tapat_admin_2026"
 
   if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 
-  # Sidebar navigation & settings
   st.sidebar.title("Navigation & Settings")
 
   nav_options = [
@@ -195,11 +227,11 @@ else:
       st.success("Header banner updated! Refresh the page to see it.")
 
     st.markdown("---")
-    if st.button("🗑️ Clear All Logged Data"):
+    if st.button("🗑️ Clear Local Backup CSV Data"):
       if os.path.exists(FILENAME):
         os.remove(FILENAME)
         st.cache_data.clear()
-        st.success("All logs cleared successfully!")
+        st.success("Local backup logs cleared successfully!")
         st.rerun()
 
     st.markdown("---")
@@ -244,7 +276,7 @@ if menu == "Log Parking Counts":
       " service."
   )
 
-  with st.form("table_entry_form"):
+  with st.form("table_entry_form", clear_on_submit=True):
     counts_data = {}
 
     for area in active_parking_areas:
@@ -298,7 +330,7 @@ if menu == "Log Parking Counts":
         new_entries.append({
             "Timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
             "Date": log_date.strftime("%Y-%m-%d"),
-            "Week_Number": week_num,
+            "Week_Number": int(week_num),
             "Location": selected_location,
             "Service": selected_service,
             "Parking_Area": area,
@@ -310,13 +342,12 @@ if menu == "Log Parking Counts":
       new_df = pd.DataFrame(new_entries)
 
       try:
-        df = load_data()
-        df = pd.concat([df, new_df], ignore_index=True)
-        df.to_csv(FILENAME, index=False)
+        save_data(new_df)
         st.cache_data.clear()
         st.success(
             f"Successfully saved counts for {selected_location} -"
-            f" {selected_service} (Assigned to Week {week_num})!"
+            f" {selected_service} (Assigned to Week {week_num})! Form reset to"
+            " 0."
         )
       except Exception as e:
         st.error(f"Error saving data: {e}")
@@ -415,32 +446,14 @@ elif menu == "View Weekly Report":
             mime="text/csv",
         )
 
-        photos = filtered_df[
-            filtered_df["Photo_Path"].notna() & (filtered_df["Photo_Path"] != "")
-        ]["Photo_Path"].unique()
-
-        if len(photos) > 0:
-          st.markdown("---")
-          st.subheader("🖼️ Attached Verification Photos")
-          cols = st.columns(min(len(photos), 3))
-          for idx, photo_path in enumerate(photos):
-            if os.path.exists(photo_path):
-              with cols[idx % 3]:
-                st.image(
-                    photo_path,
-                    caption=os.path.basename(photo_path),
-                    use_container_width=True,
-                )
-
 # --- TAB 3: SUMMARY DASHBOARD ---
 elif menu == "Summary Dashboard":
-  st.header("📈 Weekly Parking Report")
+  st.header("📈 Weekly Parking Leadership Dashboard")
   st.caption(
       "Executive overview of service-by-service vehicle counts and location"
       " subtotals."
   )
 
-  # Share link helper box for Marshals (hidden when viewed via leadership link)
   if not is_leadership_view:
     with st.expander("🔗 Share Leadership Link"):
       st.info(
@@ -505,7 +518,6 @@ elif menu == "Summary Dashboard":
         st.markdown("---")
         st.subheader("🌐 Overall Summary")
 
-        # Visually appealing card metrics
         c1, c2, c3 = st.columns(3)
         with c1:
           st.metric("🚘 Total Cars", f"{total_cars_all:,}")
@@ -608,10 +620,19 @@ elif menu == "Data Verification" and getattr(
 
       with col_btn:
         if st.button("🗑️ Delete", key=f"del_submission_{idx}"):
+          # Delete row locally & update
           df_verify = df_verify[df_verify["Timestamp"] != ts].reset_index(
               drop=True
           )
           df_verify.to_csv(FILENAME, index=False)
+
+          conn = get_connection()
+          if conn is not None:
+            try:
+              conn.update(data=df_verify)
+            except Exception:
+              pass
+
           st.cache_data.clear()
           st.success("Deleted submission entry!")
           st.rerun()
