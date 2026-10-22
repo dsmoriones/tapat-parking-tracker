@@ -423,3 +423,311 @@ if menu == "Log Parking Counts":
             "Location": selected_location,
             "Service": selected_service,
             "Parking_Area": area,
+            "Car_Count": int(vals["cars"]),
+            "Motorcycle_Count": int(vals["motors"]),
+            "Photo_Path": saved_image_path,
+        })
+
+      new_df = pd.DataFrame(new_entries)
+
+      try:
+        save_data(new_df)
+        st.cache_data.clear()
+        st.success(
+            f"Successfully saved counts for {selected_location} -"
+            f" {selected_service} (Assigned to Week {week_num})! Form reset to"
+            " 0."
+        )
+      except Exception as e:
+        st.error(f"Error saving data: {e}")
+
+# --- TAB 2: VIEW WEEKLY REPORT ---
+elif menu == "View Weekly Report":
+  st.header("📊 Weekly Summary Report")
+
+  df = load_data()
+
+  if df.empty:
+    st.info("No parking logs found yet.")
+  else:
+    today = datetime.now()
+    if today.weekday() == 6:
+      curr_calc_date = today - timedelta(days=1)
+    else:
+      curr_calc_date = today
+
+    current_week = curr_calc_date.isocalendar()[1]
+
+    selected_week = st.number_input(
+        "Select Week Number:",
+        min_value=1,
+        max_value=53,
+        value=int(current_week),
+    )
+
+    filtered_df = df[df["Week_Number"] == selected_week]
+
+    if filtered_df.empty:
+      st.warning(f"No records found for Week {selected_week}.")
+    else:
+      report_location = st.selectbox(
+          "Filter Report by Location:",
+          ["All Locations"] + list(LOCATION_CONFIG.keys()),
+      )
+
+      if report_location != "All Locations":
+        filtered_df = filtered_df[filtered_df["Location"] == report_location]
+
+      if filtered_df.empty:
+        st.warning(
+            f"No records found for {report_location} in Week {selected_week}."
+        )
+      else:
+        filtered_df["Total_Vehicles"] = (
+            filtered_df["Car_Count"] + filtered_df["Motorcycle_Count"]
+        )
+
+        st.subheader(f"Summary Breakdown for Week {selected_week}")
+
+        summary_table = (
+            filtered_df.groupby(["Location", "Parking_Area"])[
+                ["Car_Count", "Motorcycle_Count", "Total_Vehicles"]
+            ]
+            .sum()
+            .reset_index()
+        )
+
+        if report_location != "All Locations":
+          custom_order = LOCATION_CONFIG[report_location]["areas"]
+          summary_table["Parking_Area"] = pd.Categorical(
+              summary_table["Parking_Area"],
+              categories=custom_order,
+              ordered=True,
+          )
+          summary_table = summary_table.sort_values("Parking_Area")
+
+        summary_table.columns = [
+            "Location",
+            "Parking Area",
+            "Cars",
+            "Motorcycles",
+            "Total Vehicles",
+        ]
+
+        st.dataframe(summary_table, use_container_width=True)
+
+        total_cars = filtered_df["Car_Count"].sum()
+        total_motors = filtered_df["Motorcycle_Count"].sum()
+        grand_total = filtered_df["Total_Vehicles"].sum()
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Cars", total_cars)
+        col2.metric("Total Motorcycles", total_motors)
+        col3.metric("Combined Grand Total", grand_total)
+
+        csv_data = summary_table.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="📥 Download Weekly Report (CSV)",
+            data=csv_data,
+            file_name=(
+                f"tapat_weekly_report_week_{selected_week}_{report_location.replace(' ', '_')}.csv"
+            ),
+            mime="text/csv",
+        )
+
+# --- TAB 3: SUMMARY DASHBOARD ---
+elif menu == "Summary Dashboard":
+  st.header("📈 Weekly Parking Leadership Dashboard")
+  st.caption(
+      "Executive overview of service-by-service vehicle counts and location"
+      " subtotals."
+  )
+
+  if not is_leadership_view:
+    with st.expander("🔗 Share Leadership Link"):
+      st.info(
+          "Send this direct link to church leadership so they can view only the"
+          " clean summary dashboard:"
+      )
+      st.code(
+          "https://tapat-parking-tracker.streamlit.app/?view=leadership",
+          language="text",
+      )
+
+  df = load_data()
+
+  if df.empty:
+    st.info("No parking logs recorded yet.")
+  else:
+    col_week, col_loc = st.columns(2)
+
+    today = datetime.now()
+    if today.weekday() == 6:
+      curr_calc_date = today - timedelta(days=1)
+    else:
+      curr_calc_date = today
+
+    current_week = curr_calc_date.isocalendar()[1]
+
+    with col_week:
+      selected_week = st.number_input(
+          "Select Week Number:",
+          min_value=1,
+          max_value=53,
+          value=int(current_week),
+          key="dash_week",
+      )
+
+    with col_loc:
+      selected_dash_loc = st.selectbox(
+          "Filter by Church Location:",
+          ["All Locations"] + list(LOCATION_CONFIG.keys()),
+          key="dash_loc_filter",
+      )
+
+    week_df = df[df["Week_Number"] == selected_week]
+
+    if week_df.empty:
+      st.warning(f"No records found for Week {selected_week}.")
+    else:
+      if selected_dash_loc != "All Locations":
+        filtered_dash_df = week_df[week_df["Location"] == selected_dash_loc]
+      else:
+        filtered_dash_df = week_df
+
+      if filtered_dash_df.empty:
+        st.warning(
+            f"No records logged for {selected_dash_loc} in Week {selected_week}."
+        )
+      else:
+        total_cars_all = filtered_dash_df["Car_Count"].sum()
+        total_motors_all = filtered_dash_df["Motorcycle_Count"].sum()
+        grand_total_vehicles = total_cars_all + total_motors_all
+
+        st.markdown("---")
+        st.subheader("🌐 Overall Summary")
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+          st.metric("🚘 Total Cars", f"{total_cars_all:,}")
+        with c2:
+          st.metric("🛵 Total Motorcycles", f"{total_motors_all:,}")
+        with c3:
+          st.metric("📊 Grand Total Vehicles", f"{grand_total_vehicles:,}")
+
+        st.markdown("---")
+
+        if selected_dash_loc == "All Locations":
+          target_locations = list(LOCATION_CONFIG.keys())
+        else:
+          target_locations = [selected_dash_loc]
+
+        for loc in target_locations:
+          loc_df = week_df[week_df["Location"] == loc]
+
+          if not loc_df.empty:
+            with st.container(border=True):
+              st.markdown(f"### 📍 {loc}")
+
+              service_grouped = (
+                  loc_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
+                  .sum()
+                  .reset_index()
+              )
+
+              config_services = LOCATION_CONFIG[loc]["services"]
+              service_grouped["Service"] = pd.Categorical(
+                  service_grouped["Service"],
+                  categories=config_services,
+                  ordered=True,
+              )
+              service_grouped = service_grouped.sort_values("Service")
+
+              loc_cars = 0
+              loc_motors = 0
+
+              for _, row in service_grouped.iterrows():
+                svc = row["Service"]
+                c = int(row["Car_Count"])
+                m = int(row["Motorcycle_Count"])
+                tot = c + m
+                loc_cars += c
+                loc_motors += m
+
+                st.write(
+                    f"• **{svc}:** {c:,} Cars | {m:,} Motorcycles *(Total:"
+                    f" {tot:,})*"
+                )
+
+              loc_combined = loc_cars + loc_motors
+              st.success(
+                  f"**{loc} Subtotal:** {loc_cars:,} Cars + {loc_motors:,}"
+                  f" Motorcycles = **{loc_combined:,} Total Vehicles**"
+              )
+
+# --- SECRET TAB 4: DATA VERIFICATION (ADMIN ONLY) ---
+elif menu == "Data Verification" and getattr(
+    st.session_state, "is_admin", False
+):
+  st.header("🔒 Admin Data Verification Log")
+  st.caption(
+      "Clean single-line entries showing timestamps, locations, and total"
+      " vehicle counts."
+  )
+
+  df_verify = load_data()
+
+  if df_verify.empty:
+    st.info("No parking log entries found.")
+  else:
+    st.markdown("---")
+
+    grouped_entries = (
+        df_verify.groupby(["Timestamp", "Date", "Location", "Service"])[
+            ["Car_Count", "Motorcycle_Count"]
+        ]
+        .sum()
+        .reset_index()
+    )
+
+    for idx, row in grouped_entries.iloc[::-1].iterrows():
+      ts = row["Timestamp"]
+      dt = row["Date"]
+      loc = row["Location"]
+      svc = row["Service"]
+      cars = int(row["Car_Count"])
+      motors = int(row["Motorcycle_Count"])
+      tot = cars + motors
+
+      col_text, col_btn = st.columns([5, 1])
+
+      with col_text:
+        st.markdown(
+            f"🕒 **`{ts}`** | 📍 **{loc}** ({svc}) — Date: `{dt}` | 🚘"
+            f" `{cars}` Cars | 🛵 `{motors}` Motors | **Total: {tot}**"
+        )
+
+      with col_btn:
+        if st.button("🗑️ Delete", key=f"del_submission_{idx}"):
+          # Delete from Turso Cloud DB
+          conn, _ = get_turso_db()
+          if conn is not None:
+            try:
+              conn.execute(
+                  "DELETE FROM parking_logs WHERE Timestamp = ?", (ts,)
+              )
+              conn.commit()
+            except Exception:
+              pass
+
+          # Delete locally from CSV backup if exists
+          if os.path.exists(FILENAME):
+            df_csv = pd.read_csv(FILENAME)
+            df_csv = df_csv[df_csv["Timestamp"] != ts]
+            df_csv.to_csv(FILENAME, index=False)
+
+          st.cache_data.clear()
+          st.success("Deleted submission entry from cloud database!")
+          st.rerun()
+
+      st.markdown("---")
