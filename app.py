@@ -214,7 +214,7 @@ def save_data(new_entries_df):
 def kpi_card(title, value, icon, accent_color="#2563eb"):
   return f"""
     <div style="
-        background-color: rgba(30, 41, 59, 0.75);
+        background-color: var(--background-secondary-color, #1e293b);
         padding: 18px;
         border-radius: 14px;
         border-top: 4px solid {accent_color};
@@ -232,7 +232,7 @@ def status_badge(is_online=True):
   color = "#10b981" if is_online else "#f59e0b"
   label = "TURSO CLOUD ONLINE" if is_online else "LOCAL CSV BACKUP MODE"
   return f"""
-    <div style="display: inline-flex; align-items: center; gap: 8px; background-color: rgba(30, 41, 59, 0.8); border: 1px solid rgba(51, 65, 85, 0.8); padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+    <div style="display: inline-flex; align-items: center; gap: 8px; background-color: rgba(30, 41, 59, 0.8); border: 1px solid rgba(51, 65, 85, 0.8); padding: 5px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
         <span style="height: 8px; width: 8px; background-color: {color}; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px {color};"></span>
         <span style="color: #f8fafc; letter-spacing: 0.5px;">{label}</span>
     </div>
@@ -427,7 +427,7 @@ if menu == "Log Parking Counts":
 
     log_date = st.date_input("📅 Log Date", datetime.now())
 
-  st.markdown("### 🚘 Rapid Area Count Logger")
+  st.markdown("### 🚘 Area Count Inputs")
 
   with st.form("table_entry_form", clear_on_submit=True):
     counts_data = {}
@@ -435,86 +435,20 @@ if menu == "Log Parking Counts":
     for area in active_parking_areas:
       with st.container(border=True):
         st.markdown(f"#### 🅿️ {area}")
-
-        # Initialize session state keys for quick steppers
-        if f"car_{area}" not in st.session_state:
-          st.session_state[f"car_{area}"] = 0
-        if f"motor_{area}" not in st.session_state:
-          st.session_state[f"motor_{area}"] = 0
-
-        # Cars Stepper Controls
-        st.markdown("**🚘 Cars**")
-        c_val = st.number_input(
-            f"Car Count ({area})",
-            min_value=0,
-            step=1,
-            key=f"car_{area}",
-            label_visibility="collapsed",
-        )
-
-        # Quick Tap Stepper Buttons for Cars (with unique keys)
-        b1, b2, b3, b4 = st.columns(4)
-        if b1.form_submit_button(
-            "+1 Car", key=f"car_plus1_{area}", use_container_width=True
-        ):
-          st.session_state[f"car_{area}"] += 1
-          st.rerun()
-        if b2.form_submit_button(
-            "+5 Cars", key=f"car_plus5_{area}", use_container_width=True
-        ):
-          st.session_state[f"car_{area}"] += 5
-          st.rerun()
-        if b3.form_submit_button(
-            "-1 Car", key=f"car_minus1_{area}", use_container_width=True
-        ):
-          st.session_state[f"car_{area}"] = max(
-              0, st.session_state[f"car_{area}"] - 1
+        col1, col2 = st.columns(2)
+        with col1:
+          cars = st.number_input(
+              f"🚘 Cars", min_value=0, step=1, value=0, key=f"car_{area}"
           )
-          st.rerun()
-        if b4.form_submit_button(
-            "Reset", key=f"car_reset_{area}", use_container_width=True
-        ):
-          st.session_state[f"car_{area}"] = 0
-          st.rerun()
-
-        st.markdown("---")
-
-        # Motorcycles Stepper Controls
-        st.markdown("**🛵 Motorcycles**")
-        m_val = st.number_input(
-            f"Motorcycle Count ({area})",
-            min_value=0,
-            step=1,
-            key=f"motor_{area}",
-            label_visibility="collapsed",
-        )
-
-        # Quick Tap Stepper Buttons for Motorcycles (with unique keys)
-        m1, m2, m3, m4 = st.columns(4)
-        if m1.form_submit_button(
-            "+1 Motor", key=f"motor_plus1_{area}", use_container_width=True
-        ):
-          st.session_state[f"motor_{area}"] += 1
-          st.rerun()
-        if m2.form_submit_button(
-            "+5 Motors", key=f"motor_plus5_{area}", use_container_width=True
-        ):
-          st.session_state[f"motor_{area}"] += 5
-          st.rerun()
-        if m3.form_submit_button(
-            "-1 Motor", key=f"motor_minus1_{area}", use_container_width=True
-        ):
-          st.session_state[f"motor_{area}"] = max(
-              0, st.session_state[f"motor_{area}"] - 1
+        with col2:
+          motors = st.number_input(
+              f"🛵 Motorcycles",
+              min_value=0,
+              step=1,
+              value=0,
+              key=f"motor_{area}",
           )
-          st.rerun()
-        if m4.form_submit_button(
-            "Reset", key=f"motor_reset_{area}", use_container_width=True
-        ):
-          st.session_state[f"motor_{area}"] = 0
-          st.rerun()
-
-        counts_data[area] = {"cars": c_val, "motors": m_val}
+        counts_data[area] = {"cars": cars, "motors": motors}
 
     st.markdown("### 📷 Photo Verification (Optional)")
     uploaded_file = st.file_uploader(
@@ -803,6 +737,21 @@ elif menu == "Summary Dashboard":
               ),
               unsafe_allow_html=True,
           )
+
+        st.divider()
+
+        # --- ADDED: SUMMARY TAB BREAKDOWN CHART ---
+        st.markdown("### 📊 Weekly Vehicle Distribution Chart")
+        chart_summary_df = (
+            filtered_dash_df.groupby("Parking_Area")[
+                ["Car_Count", "Motorcycle_Count"]
+            ]
+            .sum()
+            .rename(
+                columns={"Car_Count": "Cars", "Motorcycle_Count": "Motorcycles"}
+            )
+        )
+        st.bar_chart(chart_summary_df, color=["#3b82f6", "#10b981"], height=300)
 
         st.divider()
 
