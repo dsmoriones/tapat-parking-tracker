@@ -740,21 +740,6 @@ elif menu == "Summary Dashboard":
 
         st.divider()
 
-        # --- ADDED: SUMMARY TAB BREAKDOWN CHART ---
-        st.markdown("### 📊 Weekly Vehicle Distribution Chart")
-        chart_summary_df = (
-            filtered_dash_df.groupby("Parking_Area")[
-                ["Car_Count", "Motorcycle_Count"]
-            ]
-            .sum()
-            .rename(
-                columns={"Car_Count": "Cars", "Motorcycle_Count": "Motorcycles"}
-            )
-        )
-        st.bar_chart(chart_summary_df, color=["#3b82f6", "#10b981"], height=300)
-
-        st.divider()
-
         target_locations = (
             list(LOCATION_CONFIG.keys())
             if selected_dash_loc == "All Locations"
