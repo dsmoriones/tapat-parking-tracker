@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import io
 import os
 import pandas as pd
 from PIL import Image
@@ -532,15 +533,58 @@ elif menu == "View Weekly Report":
         col2.metric("Total Motorcycles", total_motors)
         col3.metric("Combined Grand Total", grand_total)
 
-        csv_data = summary_table.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="📥 Download Weekly Report (CSV)",
-            data=csv_data,
-            file_name=(
-                f"tapat_weekly_report_week_{selected_week}_{report_location.replace(' ', '_')}.csv"
-            ),
-            mime="text/csv",
-        )
+        st.markdown("---")
+
+        # --- PREPARE EXPORT DATASET (Week Number, Church Location, Parking Location, Number) ---
+        export_df = summary_table.copy()
+        export_df.insert(0, "Week Number", int(selected_week))
+        # Keep only required columns in exact order
+        export_df = export_df[[
+            "Week Number",
+            "Location",
+            "Parking Area",
+            "Total Vehicles",
+        ]]
+        export_df.columns = [
+            "Week Number",
+            "Church Location",
+            "Parking Location",
+            "Vehicle Count",
+        ]
+
+        # Download Buttons Side-by-Side
+        dl_col1, dl_col2 = st.columns(2)
+
+        with dl_col1:
+          csv_data = summary_table.to_csv(index=False).encode("utf-8")
+          st.download_button(
+              label="📥 Download Summary (CSV)",
+              data=csv_data,
+              file_name=(
+                  f"tapat_weekly_report_week_{selected_week}_{report_location.replace(' ', '_')}.csv"
+              ),
+              mime="text/csv",
+              use_container_width=True,
+          )
+
+        with dl_col2:
+          # Excel Export via io.BytesIO
+          excel_buffer = io.BytesIO()
+          with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+            export_df.to_excel(writer, index=False, sheet_name="Weekly Report")
+          excel_data = excel_buffer.getvalue()
+
+          st.download_button(
+              label="📥 Download Report (Excel)",
+              data=excel_data,
+              file_name=(
+                  f"tapat_weekly_report_week_{selected_week}_{report_location.replace(' ', '_')}.xlsx"
+              ),
+              mime=(
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              ),
+              use_container_width=True,
+          )
 
 # --- TAB 3: SUMMARY DASHBOARD ---
 elif menu == "Summary Dashboard":
