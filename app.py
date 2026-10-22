@@ -210,6 +210,22 @@ def save_data(new_entries_df):
     st.error(f"Error saving to local CSV: {e}")
 
 
+def kpi_card(title, value, icon, accent_color="#2563eb"):
+  return f"""
+    <div style="
+        background-color: var(--background-secondary-color, #1e293b);
+        padding: 16px;
+        border-radius: 12px;
+        border-top: 4px solid {accent_color};
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        margin-bottom: 15px;
+    ">
+        <p style="margin: 0; font-size: 0.85rem; opacity: 0.8; font-weight: 500;">{icon} {title}</p>
+        <h2 style="margin: 4px 0 0 0; font-size: 1.8rem; font-weight: 700;">{value:,}</h2>
+    </div>
+    """
+
+
 st.set_page_config(
     page_title="TAPAT Parking Tracker", page_icon="🚗", layout="centered"
 )
@@ -218,7 +234,6 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-        /* Card & Metric Container Customization */
         [data-testid="stMetric"] {
             background-color: var(--background-secondary-color, #1e293b);
             padding: 16px;
@@ -226,12 +241,10 @@ st.markdown(
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             border: 1px solid var(--border-color, #334155);
         }
-        /* Primary Submit Buttons */
         .stButton>button {
             border-radius: 8px;
             font-weight: 600;
         }
-        /* Input Form Card Separation */
         div[data-testid="stVerticalBlock"] > div[style*="border"] {
             border-radius: 12px;
             padding: 16px;
@@ -513,9 +526,27 @@ elif menu == "View Weekly Report":
       grand_total = filtered_df["Total_Vehicles"].sum()
 
       col1, col2, col3 = st.columns(3)
-      col1.metric("🚘 Total Cars", f"{total_cars:,}")
-      col2.metric("🛵 Total Motorcycles", f"{total_motors:,}")
-      col3.metric("📊 Grand Total", f"{grand_total:,}")
+      with col1:
+        st.markdown(
+            kpi_card("Total Cars", total_cars, "🚘", "#3b82f6"),
+            unsafe_allow_html=True,
+        )
+      with col2:
+        st.markdown(
+            kpi_card("Total Motorcycles", total_motors, "🛵", "#10b981"),
+            unsafe_allow_html=True,
+        )
+      with col3:
+        st.markdown(
+            kpi_card("Grand Total", grand_total, "📊", "#8b5cf6"),
+            unsafe_allow_html=True,
+        )
+
+      st.markdown("### 📊 Area Comparison Breakdown")
+      chart_data = summary_table.set_index("Parking Area")[
+          ["Cars", "Motorcycles"]
+      ]
+      st.bar_chart(chart_data, color=["#3b82f6", "#10b981"], height=280)
 
       st.markdown("---")
 
@@ -632,11 +663,22 @@ elif menu == "Summary Dashboard":
         st.markdown("---")
         c1, c2, c3 = st.columns(3)
         with c1:
-          st.metric("🚘 Total Cars", f"{total_cars_all:,}")
+          st.markdown(
+              kpi_card("Total Cars", total_cars_all, "🚘", "#3b82f6"),
+              unsafe_allow_html=True,
+          )
         with c2:
-          st.metric("🛵 Total Motorcycles", f"{total_motors_all:,}")
+          st.markdown(
+              kpi_card("Total Motorcycles", total_motors_all, "🛵", "#10b981"),
+              unsafe_allow_html=True,
+          )
         with c3:
-          st.metric("📊 Grand Total Vehicles", f"{grand_total_vehicles:,}")
+          st.markdown(
+              kpi_card(
+                  "Grand Total Vehicles", grand_total_vehicles, "📊", "#8b5cf6"
+              ),
+              unsafe_allow_html=True,
+          )
 
         st.markdown("---")
 
