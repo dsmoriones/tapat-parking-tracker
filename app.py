@@ -23,6 +23,24 @@ FILENAME = "tapat_parking_logs.csv"
 IMAGE_DIR = "uploaded_photos"
 HEADER_BANNER_PATH = "tapat_banner.png"
 
+# Capacity estimates per parking area (for visual capacity bars)
+AREA_CAPACITIES = {
+    "Parking 1": 50,
+    "Parking 2": 40,
+    "Parking 3": 35,
+    "Parking 4": 30,
+    "Parking 5": 25,
+    "Parking 6": 25,
+    "Parking 7": 20,
+    "Parking 8": 20,
+    "Parking 9": 15,
+    "Parking 10": 15,
+    "Basement": 60,
+    "Open Parking": 100,
+    "Main Parking": 80,
+    "BIR": 40,
+}
+
 # Ensure local storage directory exists
 if not os.path.exists(IMAGE_DIR):
   os.makedirs(IMAGE_DIR)
@@ -210,6 +228,7 @@ def save_data(new_entries_df):
     st.error(f"Error saving to local CSV: {e}")
 
 
+# --- UI HELPER COMPONENTS ---
 def kpi_card(title, value, icon, accent_color="#2563eb"):
   return f"""
     <div style="
@@ -218,12 +237,57 @@ def kpi_card(title, value, icon, accent_color="#2563eb"):
         border-radius: 12px;
         border-top: 4px solid {accent_color};
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        margin-bottom: 15px;
+        margin-bottom: 12px;
     ">
         <p style="margin: 0; font-size: 0.85rem; opacity: 0.8; font-weight: 500;">{icon} {title}</p>
         <h2 style="margin: 4px 0 0 0; font-size: 1.8rem; font-weight: 700;">{value:,}</h2>
     </div>
     """
+
+
+def status_badge(is_online=True):
+  color = "#10b981" if is_online else "#f59e0b"
+  label = "TURSO CLOUD ONLINE" if is_online else "LOCAL CSV BACKUP MODE"
+  return f"""
+    <div style="display: inline-flex; align-items: center; gap: 6px; background-color: #1e293b; border: 1px solid #334155; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; margin-bottom: 15px;">
+        <span style="height: 8px; width: 8px; background-color: {color}; border-radius: 50%; display: inline-block;"></span>
+        <span style="color: #f8fafc;">{label}</span>
+    </div>
+    """
+
+
+def empty_state_card(message="No parking logs recorded for this selection."):
+  st.markdown(
+      f"""
+    <div style="text-align: center; padding: 30px; background-color: #1e293b; border-radius: 12px; border: 2px dashed #334155; margin: 15px 0;">
+        <p style="font-size: 2.2rem; margin-bottom: 8px;">📋</p>
+        <h4 style="margin: 0; opacity: 0.9; color: #f8fafc;">{message}</h4>
+        <p style="font-size: 0.85rem; opacity: 0.6; margin-top: 6px; color: #94a3b8;">Select another week/location or switch to "Log Parking Counts" to insert data.</p>
+    </div>
+    """,
+      unsafe_allow_html=True,
+  )
+
+
+def capacity_progress_bar(area_name, current_count, capacity):
+  percentage = min(int((current_count / max(1, capacity)) * 100), 100)
+  color = (
+      "#10b981" if percentage < 70 else "#f59e0b" if percentage < 90 else "#ef4444"
+  )
+  st.markdown(
+      f"""
+    <div style="margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">
+            <span>🅿️ {area_name}</span>
+            <span>{current_count} / {capacity} vehicles ({percentage}%)</span>
+        </div>
+        <div style="background-color: #334155; border-radius: 8px; height: 10px; width: 100%;">
+            <div style="background-color: {color}; width: {percentage}%; height: 100%; border-radius: 8px; transition: width 0.4s ease;"></div>
+        </div>
+    </div>
+    """,
+      unsafe_allow_html=True,
+  )
 
 
 st.set_page_config(
@@ -353,6 +417,8 @@ if os.path.exists(HEADER_BANNER_PATH):
 else:
   st.title("🚗 TAPAT PARKING MANAGEMENT SYSTEM")
 
+st.markdown(status_badge(HAS_TURSO), unsafe_allow_html=True)
+
 # --- TAB 1: LOG PARKING COUNTS ---
 if menu == "Log Parking Counts":
   st.header("📝 Log Parking Counts")
@@ -458,7 +524,7 @@ elif menu == "View Weekly Report":
   df = load_data()
 
   if df.empty:
-    st.info("No parking logs found yet.")
+    empty_state_card("No parking logs found yet.")
   else:
     today = datetime.now()
     if today.weekday() == 6:
@@ -488,7 +554,7 @@ elif menu == "View Weekly Report":
       filtered_df = filtered_df[filtered_df["Location"] == report_location]
 
     if filtered_df.empty:
-      st.warning(
+      empty_state_card(
           f"No records found for Week {selected_week} ({report_location})."
       )
     else:
@@ -542,7 +608,14 @@ elif menu == "View Weekly Report":
             unsafe_allow_html=True,
         )
 
-      st.markdown("### 📊 Area Comparison Breakdown")
+      st.markdown("### 📊 Area Occupancy Progress")
+      for _, row in summary_table.iterrows():
+        area = row["Parking Area"]
+        tot = row["Total Vehicles"]
+        cap = AREA_CAPACITIES.get(area, 50)
+        capacity_progress_bar(area, tot, cap)
+
+      st.markdown("### 📈 Vehicle Breakdown Chart")
       chart_data = summary_table.set_index("Parking Area")[
           ["Cars", "Motorcycles"]
       ]
@@ -613,7 +686,7 @@ elif menu == "Summary Dashboard":
   df = load_data()
 
   if df.empty:
-    st.info("No parking logs recorded yet.")
+    empty_state_card("No parking logs recorded yet.")
   else:
     col_week, col_loc = st.columns(2)
 
@@ -644,7 +717,7 @@ elif menu == "Summary Dashboard":
     week_df = df[df["Week_Number"] == selected_week]
 
     if week_df.empty:
-      st.warning(f"No records found for Week {selected_week}.")
+      empty_state_card(f"No records found for Week {selected_week}.")
     else:
       if selected_dash_loc != "All Locations":
         filtered_dash_df = week_df[week_df["Location"] == selected_dash_loc]
@@ -652,7 +725,7 @@ elif menu == "Summary Dashboard":
         filtered_dash_df = week_df
 
       if filtered_dash_df.empty:
-        st.warning(
+        empty_state_card(
             f"No records logged for {selected_dash_loc} in Week {selected_week}."
         )
       else:
@@ -740,7 +813,7 @@ elif menu == "Data Verification" and getattr(
   df_verify = load_data()
 
   if df_verify.empty:
-    st.info("No parking log entries found.")
+    empty_state_card("No parking log entries found.")
   else:
     st.markdown("---")
 
