@@ -659,7 +659,7 @@ elif menu == "View Weekly Report":
 
 # --- TAB 3: SUMMARY DASHBOARD ---
 elif menu == "Summary Dashboard":
-  st.header("📈 Leadership Executive Dashboard", anchor=False)
+  st.header("📈 COG Dasmarinas Weekly Parking Report", anchor=False)
 
   if not is_leadership_view:
     with st.expander("🔗 Share Clean Executive Link"):
