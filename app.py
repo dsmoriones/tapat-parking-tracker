@@ -452,20 +452,28 @@ if menu == "Log Parking Counts":
             label_visibility="collapsed",
         )
 
-        # Quick Tap Stepper Buttons for Cars
+        # Quick Tap Stepper Buttons for Cars (with unique keys)
         b1, b2, b3, b4 = st.columns(4)
-        if b1.form_submit_button("+1 Car", use_container_width=True):
+        if b1.form_submit_button(
+            "+1 Car", key=f"car_plus1_{area}", use_container_width=True
+        ):
           st.session_state[f"car_{area}"] += 1
           st.rerun()
-        if b2.form_submit_button("+5 Cars", use_container_width=True):
+        if b2.form_submit_button(
+            "+5 Cars", key=f"car_plus5_{area}", use_container_width=True
+        ):
           st.session_state[f"car_{area}"] += 5
           st.rerun()
-        if b3.form_submit_button("-1 Car", use_container_width=True):
+        if b3.form_submit_button(
+            "-1 Car", key=f"car_minus1_{area}", use_container_width=True
+        ):
           st.session_state[f"car_{area}"] = max(
               0, st.session_state[f"car_{area}"] - 1
           )
           st.rerun()
-        if b4.form_submit_button("Reset", use_container_width=True):
+        if b4.form_submit_button(
+            "Reset", key=f"car_reset_{area}", use_container_width=True
+        ):
           st.session_state[f"car_{area}"] = 0
           st.rerun()
 
@@ -481,20 +489,28 @@ if menu == "Log Parking Counts":
             label_visibility="collapsed",
         )
 
-        # Quick Tap Stepper Buttons for Motorcycles
+        # Quick Tap Stepper Buttons for Motorcycles (with unique keys)
         m1, m2, m3, m4 = st.columns(4)
-        if m1.form_submit_button("+1 Motor", use_container_width=True):
+        if m1.form_submit_button(
+            "+1 Motor", key=f"motor_plus1_{area}", use_container_width=True
+        ):
           st.session_state[f"motor_{area}"] += 1
           st.rerun()
-        if m2.form_submit_button("+5 Motors", use_container_width=True):
+        if m2.form_submit_button(
+            "+5 Motors", key=f"motor_plus5_{area}", use_container_width=True
+        ):
           st.session_state[f"motor_{area}"] += 5
           st.rerun()
-        if m3.form_submit_button("-1 Motor", use_container_width=True):
+        if m3.form_submit_button(
+            "-1 Motor", key=f"motor_minus1_{area}", use_container_width=True
+        ):
           st.session_state[f"motor_{area}"] = max(
               0, st.session_state[f"motor_{area}"] - 1
           )
           st.rerun()
-        if m4.form_submit_button("Reset", use_container_width=True):
+        if m4.form_submit_button(
+            "Reset", key=f"motor_reset_{area}", use_container_width=True
+        ):
           st.session_state[f"motor_{area}"] = 0
           st.rerun()
 
