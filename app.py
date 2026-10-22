@@ -16,7 +16,7 @@ except Exception as e:
 
 # --- TURSO CREDENTIALS & DB SETUP ---
 TURSO_DB_URL = "https://tapat-parking-db-dsmoriones.aws-eu-west-1.turso.io"
-TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI2NzgyODEsImlkIjoiMDFhMTYzZGEtMWQwMS03NjFjLTkxNGEtZmNhZjMxM2ZlMjdjIiwia2lkIjoiWk00cjVhRGMxMFYxY2Z4amJGa2YtRjZHR2VmeW9ybEt5eHVJMEpXS0tYdyIsInJpZCI6ImEwZWYxNGIwLWU0MDUtNGE1MS1iNWUxLTRjYTQ1YmZhMjI2NSJ9.9uDmKwNjgA7YGOj_bvX3P85-vmh9is0YCzZEv4fL6RK0YSxnpFcnY1gc_3jUXN-dfgOARYkdEcFFshN1QE37Cg"
+TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI2NzY5OTAsImlkIjoiMDFhMTYzZGEtMWQwMS03NjFjLTkxNGEtZmNhZjMxM2ZlMjdjIiwia2lkIjoiWk00cjVhRGMxMFYxY2Z4amJGa2YtRjZHR2VmeW9ybEt5eHVJMEpXS0tYdyIsInJpZCI6ImEwZWYxNGIwLWU0MDUtNGE1MS1iNWUxLTRjYTQ1YmZhMjI2NSJ9.FdbibTGIxRUCg_solBxQSI4cMBE7fmaAeDAyhGboJxmyUQ_7OozW0voi7CFM4xLN9xisdkuYhDrbtZb_ygxsCQ"
 
 FILENAME = "tapat_parking_logs.csv"
 IMAGE_DIR = "uploaded_photos"
@@ -348,6 +348,11 @@ else:
 if menu == "Log Parking Counts":
   st.header("Church of God Dasmarinas Parking Tracker")
 
+  # Show persistent success banner if stored in session state
+  if "success_message" in st.session_state:
+    st.success(st.session_state["success_message"])
+    del st.session_state["success_message"]
+
   selected_location = st.selectbox(
       "Select Church Location:", list(LOCATION_CONFIG.keys())
   )
@@ -433,11 +438,13 @@ if menu == "Log Parking Counts":
       try:
         save_data(new_df)
         st.cache_data.clear()
-        st.success(
-            f"Successfully saved counts for {selected_location} -"
+        # Store confirmation message in session state so it persists across form reset/rerun
+        st.session_state["success_message"] = (
+            f"✅ Successfully saved counts for {selected_location} -"
             f" {selected_service} (Assigned to Week {week_num})! Form reset to"
             " 0."
         )
+        st.rerun()
       except Exception as e:
         st.error(f"Error saving data: {e}")
 
