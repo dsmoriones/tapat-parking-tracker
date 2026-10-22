@@ -282,6 +282,22 @@ else:
   menu = st.sidebar.radio("Go to", nav_options)
 
   with st.sidebar.expander("⚙️ App Customization"):
+    # --- QUICK TURSO STATUS INDICATOR ---
+    st.markdown("### ☁️ Cloud Database Status")
+    if st.button("🔌 Test Connection", use_container_width=True):
+      conn = get_turso_db()
+      if conn is not None:
+        try:
+          res = conn.execute("SELECT COUNT(*) FROM parking_logs")
+          total_rows = res.fetchone()[0]
+          st.success(f"🟢 Connected to Turso!\nTotal saved entries: {total_rows}")
+        except Exception as e:
+          st.warning(f"🟡 Connected, but table query failed: {e}")
+      else:
+        st.error("🔴 Connection failed. Unable to reach Turso Cloud.")
+
+    st.markdown("---")
+
     custom_banner = st.file_uploader(
         "Upload Header Banner Image", type=["png", "jpg", "jpeg"]
     )
