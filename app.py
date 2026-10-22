@@ -15,9 +15,8 @@ except Exception as e:
   TURSO_IMPORT_ERROR = str(e)
 
 # --- TURSO CREDENTIALS & DB SETUP ---
-# Fixed to use https:// protocol required by remote libsql drivers
 TURSO_DB_URL = "https://tapat-parking-db-dsmoriones.aws-eu-west-1.turso.io"
-TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI2NzgyODEsImlkIjoiMDFhMTYzZGEtMWQwMS03NjFjLTkxNGEtZmNhZjMxM2ZlMjdjIiwia2lkIjoiWk00cjVhRGMxMFYxY2Z4amJGa2YtRjZHR2VmeW9ybEt5eHVJMEpXS0tYdyIsInJpZCI6ImEwZWYxNGIwLWU0MDUtNGE1MS1iNWUxLTRjYTQ1YmZhMjI2NSJ9.9uDmKwNjgA7YGOj_bvX3P85-vmh9is0YCzZEv4fL6RK0YSxnpFcnY1gc_3jUXN-dfgOARYkdEcFFshN1QE37Cg"
+TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI2NzY5OTAsImlkIjoiMDFhMTYzZGEtMWQwMS03NjFjLTkxNGEtZmNhZjMxM2ZlMjdjIiwia2lkIjoiWk00cjVhRGMxMFYxY2Z4amJGa2YtRjZHR2VmeW9ybEt5eHVJMEpXS0tYdyIsInJpZCI6ImEwZWYxNGIwLWU0MDUtNGE1MS1iNWUxLTRjYTQ1YmZhMjI2NSJ9.FdbibTGIxRUCg_solBxQSI4cMBE7fmaAeDAyhGboJxmyUQ_7OozW0voi7CFM4xLN9xisdkuYhDrbtZb_ygxsCQ"
 
 FILENAME = "tapat_parking_logs.csv"
 IMAGE_DIR = "uploaded_photos"
@@ -285,51 +284,57 @@ else:
 
   menu = st.sidebar.radio("Go to", nav_options)
 
-  with st.sidebar.expander("⚙️ App Customization"):
-    # --- QUICK TURSO STATUS INDICATOR & DIAGNOSTIC ---
-    st.markdown("### ☁️ Cloud Database Status")
-    if st.button("🔌 Test Connection", use_container_width=True):
-      conn, err = get_turso_db()
-      if conn is not None:
-        try:
-          res = conn.execute("SELECT COUNT(*) FROM parking_logs")
-          total_rows = res.fetchone()[0]
-          st.success(f"🟢 Connected to Turso!\nTotal saved entries: {total_rows}")
-        except Exception as e:
-          st.warning(f"🟡 Connected, but table query failed: {e}")
-      else:
-        st.error(f"🔴 Connection failed:\n`{err}`")
-
-    st.markdown("---")
-
-    custom_banner = st.file_uploader(
-        "Upload Header Banner Image", type=["png", "jpg", "jpeg"]
-    )
-    if custom_banner is not None:
-      banner_img = Image.open(custom_banner)
-      banner_img.save(HEADER_BANNER_PATH)
-      st.success("Header banner updated! Refresh the page to see it.")
-
-    st.markdown("---")
-    if st.button("🗑️ Clear Local Backup CSV Data"):
-      if os.path.exists(FILENAME):
-        os.remove(FILENAME)
-        st.cache_data.clear()
-        st.success("Local backup logs cleared successfully!")
-        st.rerun()
-
-    st.markdown("---")
-    if not st.session_state.is_admin:
-      entered_pass = st.text_input("Admin Unlock", type="password")
-      if st.button("Unlock Verification Tab"):
+  # --- ADMIN UNLOCK / APP CUSTOMIZATION SECTION ---
+  st.sidebar.markdown("---")
+  if not st.session_state.is_admin:
+    with st.sidebar.expander("🔑 Admin Unlock (Customization & Verification)"):
+      entered_pass = st.text_input(
+          "Enter Admin Password", type="password", key="admin_pass_input"
+      )
+      if st.button("Unlock Admin Features", use_container_width=True):
         if entered_pass == ADMIN_PASSWORD:
           st.session_state.is_admin = True
-          st.success("Unlocked!")
+          st.success("Admin unlocked!")
           st.rerun()
         else:
           st.error("Incorrect password.")
-    else:
-      if st.button("Lock Admin Access"):
+  else:
+    with st.sidebar.expander("⚙️ App Customization (Unlocked)", expanded=True):
+      st.markdown("### ☁️ Cloud Database Status")
+      if st.button("🔌 Test Connection", use_container_width=True):
+        conn, err = get_turso_db()
+        if conn is not None:
+          try:
+            res = conn.execute("SELECT COUNT(*) FROM parking_logs")
+            total_rows = res.fetchone()[0]
+            st.success(
+                f"🟢 Connected to Turso!\nTotal saved entries: {total_rows}"
+            )
+          except Exception as e:
+            st.warning(f"🟡 Connected, but table query failed: {e}")
+        else:
+          st.error(f"🔴 Connection failed:\n`{err}`")
+
+      st.markdown("---")
+
+      custom_banner = st.file_uploader(
+          "Upload Header Banner Image", type=["png", "jpg", "jpeg"]
+      )
+      if custom_banner is not None:
+        banner_img = Image.open(custom_banner)
+        banner_img.save(HEADER_BANNER_PATH)
+        st.success("Header banner updated! Refresh the page to see it.")
+
+      st.markdown("---")
+      if st.button("🗑️ Clear Local Backup CSV Data", use_container_width=True):
+        if os.path.exists(FILENAME):
+          os.remove(FILENAME)
+          st.cache_data.clear()
+          st.success("Local backup logs cleared successfully!")
+          st.rerun()
+
+      st.markdown("---")
+      if st.button("🔒 Lock Admin Access", use_container_width=True):
         st.session_state.is_admin = False
         st.rerun()
 
@@ -418,174 +423,3 @@ if menu == "Log Parking Counts":
             "Location": selected_location,
             "Service": selected_service,
             "Parking_Area": area,
-            "Car_Count": int(vals["cars"]),
-            "Motorcycle_Count": int(vals["motors"]),
-            "Photo_Path": saved_image_path,
-        })
-
-      new_df = pd.DataFrame(new_entries)
-
-      try:
-        save_data(new_df)
-        st.cache_data.clear()
-        st.success(
-            f"Successfully saved counts for {selected_location} -"
-            f" {selected_service} (Assigned to Week {week_num})! Form reset to"
-            " 0."
-        )
-      except Exception as e:
-        st.error(f"Error saving data: {e}")
-
-# --- TAB 2: VIEW WEEKLY REPORT ---
-elif menu == "View Weekly Report":
-  st.header("📊 Weekly Summary Report")
-
-  df = load_data()
-
-  if df.empty:
-    st.info("No parking logs found yet.")
-  else:
-    today = datetime.now()
-    if today.weekday() == 6:
-      curr_calc_date = today - timedelta(days=1)
-    else:
-      curr_calc_date = today
-
-    current_week = curr_calc_date.isocalendar()[1]
-
-    selected_week = st.number_input(
-        "Select Week Number:",
-        min_value=1,
-        max_value=53,
-        value=int(current_week),
-    )
-
-    filtered_df = df[df["Week_Number"] == selected_week]
-
-    if filtered_df.empty:
-      st.warning(f"No records found for Week {selected_week}.")
-    else:
-      report_location = st.selectbox(
-          "Filter Report by Location:",
-          ["All Locations"] + list(LOCATION_CONFIG.keys()),
-      )
-
-      if report_location != "All Locations":
-        filtered_df = filtered_df[filtered_df["Location"] == report_location]
-
-      if filtered_df.empty:
-        st.warning(
-            f"No records found for {report_location} in Week {selected_week}."
-        )
-      else:
-        filtered_df["Total_Vehicles"] = (
-            filtered_df["Car_Count"] + filtered_df["Motorcycle_Count"]
-        )
-
-        st.subheader(f"Summary Breakdown for Week {selected_week}")
-
-        summary_table = (
-            filtered_df.groupby(["Location", "Parking_Area"])[
-                ["Car_Count", "Motorcycle_Count", "Total_Vehicles"]
-            ]
-            .sum()
-            .reset_index()
-        )
-
-        if report_location != "All Locations":
-          custom_order = LOCATION_CONFIG[report_location]["areas"]
-          summary_table["Parking_Area"] = pd.Categorical(
-              summary_table["Parking_Area"],
-              categories=custom_order,
-              ordered=True,
-          )
-          summary_table = summary_table.sort_values("Parking_Area")
-
-        summary_table.columns = [
-            "Location",
-            "Parking Area",
-            "Cars",
-            "Motorcycles",
-            "Total Vehicles",
-        ]
-
-        st.dataframe(summary_table, use_container_width=True)
-
-        total_cars = filtered_df["Car_Count"].sum()
-        total_motors = filtered_df["Motorcycle_Count"].sum()
-        grand_total = filtered_df["Total_Vehicles"].sum()
-
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Cars", total_cars)
-        col2.metric("Total Motorcycles", total_motors)
-        col3.metric("Combined Grand Total", grand_total)
-
-        csv_data = summary_table.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="📥 Download Weekly Report (CSV)",
-            data=csv_data,
-            file_name=(
-                f"tapat_weekly_report_week_{selected_week}_{report_location.replace(' ', '_')}.csv"
-            ),
-            mime="text/csv",
-        )
-
-# --- TAB 3: SUMMARY DASHBOARD ---
-elif menu == "Summary Dashboard":
-  st.header("📈 Weekly Parking Leadership Dashboard")
-  st.caption(
-      "Executive overview of service-by-service vehicle counts and location"
-      " subtotals."
-  )
-
-  if not is_leadership_view:
-    with st.expander("🔗 Share Leadership Link"):
-      st.info(
-          "Send this direct link to church leadership so they can view only the"
-          " clean summary dashboard:"
-      )
-      st.code(
-          "https://tapat-parking-tracker.streamlit.app/?view=leadership",
-          language="text",
-      )
-
-  df = load_data()
-
-  if df.empty:
-    st.info("No parking logs recorded yet.")
-  else:
-    col_week, col_loc = st.columns(2)
-
-    today = datetime.now()
-    if today.weekday() == 6:
-      curr_calc_date = today - timedelta(days=1)
-    else:
-      curr_calc_date = today
-
-    current_week = curr_calc_date.isocalendar()[1]
-
-    with col_week:
-      selected_week = st.number_input(
-          "Select Week Number:",
-          min_value=1,
-          max_value=53,
-          value=int(current_week),
-          key="dash_week",
-      )
-
-    with col_loc:
-      selected_dash_loc = st.selectbox(
-          "Filter by Church Location:",
-          ["All Locations"] + list(LOCATION_CONFIG.keys()),
-          key="dash_loc_filter",
-      )
-
-    week_df = df[df["Week_Number"] == selected_week]
-
-    if week_df.empty:
-      st.warning(f"No records found for Week {selected_week}.")
-    else:
-      if selected_dash_loc != "All Locations":
-        filtered_dash_df = week_df[week_df["Location"] == selected_dash_loc]
-      else:
-        filtered_dash_df = week_df
