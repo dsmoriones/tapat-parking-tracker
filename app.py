@@ -1,6 +1,7 @@
-# --- TURSO CLOUD DATABASE SETUP & INITIALIZATION ---
+from datetime import datetime, timedelta
 import os
 import pandas as pd
+from PIL import Image
 import streamlit as st
 
 # Import Turso / libSQL driver
@@ -11,66 +12,9 @@ try:
 except ImportError:
   HAS_TURSO = False
 
-
-def get_turso_db():
-  if not HAS_TURSO:
-    st.error(
-        "libsql module not installed. Please add 'libsql-experimental' to"
-        " requirements.txt."
-    )
-    return None
-
-  db_url = st.secrets.get(
-      "TURSO_DATABASE_URL", os.environ.get("TURSO_DATABASE_URL")
-  )
-  auth_token = st.secrets.get(
-      "TURSO_AUTH_TOKEN", os.environ.get("TURSO_AUTH_TOKEN")
-  )
-
-  if not db_url or not auth_token:
-    st.error("Turso credentials missing from Streamlit secrets or environment.")
-    return None
-
-  return libsql.connect(database=db_url, auth_token=auth_token)
-
-
-def init_turso_db():
-  conn = get_turso_db()
-  if conn:
-    conn.execute("""
-            CREATE TABLE IF NOT EXISTS parking_logs (
-                Timestamp TEXT,
-                Date TEXT,
-                Week_Number INTEGER,
-                Location TEXT,
-                Service TEXT,
-                Parking_Area TEXT,
-                Car_Count INTEGER,
-                Motorcycle_Count INTEGER,
-                Photo_Path TEXT
-            )
-        """)
-    conn.commit()
-
-
-# Initialize Turso table on startup
-if HAS_TURSO:
-  try:
-    init_turso_db()
-  except Exception as e:
-    st.error(f"Turso database initialization error: {e}")
-
-# --- MAIN APP CODE BELOW ---
-from datetime import datetime, timedelta
-from PIL import Image
-
-# Optional cloud storage integration via streamlit-gsheets
-try:
-  from streamlit_gsheets import GSheetsConnection
-
-  HAS_GSHEETS = True
-except ImportError:
-  HAS_GSHEETS = False
+# --- TURSO CREDENTIALS & DB SETUP ---
+TURSO_DB_URL = "libsql://tapat-parking-db-dsmoriones.aws-eu-west-1.turso.io"
+TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI2NzY5OTAsImlkIjoiMDFhMTYzZGEtMWQwMS03NjFjLTkxNGEtZmNhZjMxM2ZlMjdjIiwia2lkIjoiWk00cjVhRGMxMFYxY2Z4amJGa2YtRjZHR2VmeW9ybEt5eHVJMEpXS0tYdyIsInJpZCI6ImEwZWYxNGIwLWU0MDUtNGE1MS1iNWUxLTRjYTQ1YmZhMjI2NSJ9.FdbibTGIxRUCg_solBxQSI4cMBE7fmaAeDAyhGboJxmyUQ_7OozW0voi7CFM4xLN9xisdkuYhDrbtZb_ygxsCQ"
 
 FILENAME = "tapat_parking_logs.csv"
 IMAGE_DIR = "uploaded_photos"
@@ -79,6 +23,42 @@ HEADER_BANNER_PATH = "tapat_banner.png"
 # Ensure local storage directory exists for uploaded images
 if not os.path.exists(IMAGE_DIR):
   os.makedirs(IMAGE_DIR)
+
+
+def get_turso_db():
+  if not HAS_TURSO:
+    return None
+  try:
+    return libsql.connect(database=TURSO_DB_URL, auth_token=TURSO_AUTH_TOKEN)
+  except Exception:
+    return None
+
+
+def init_turso_db():
+  conn = get_turso_db()
+  if conn:
+    try:
+      conn.execute("""
+                CREATE TABLE IF NOT EXISTS parking_logs (
+                    Timestamp TEXT,
+                    Date TEXT,
+                    Week_Number INTEGER,
+                    Location TEXT,
+                    Service TEXT,
+                    Parking_Area TEXT,
+                    Car_Count INTEGER,
+                    Motorcycle_Count INTEGER,
+                    Photo_Path TEXT
+                )
+            """)
+      conn.commit()
+    except Exception:
+      pass
+
+
+# Initialize Turso table on startup
+if HAS_TURSO:
+  init_turso_db()
 
 # Define Church Locations with their specific Parking Areas AND Services
 LOCATION_CONFIG = {
@@ -150,19 +130,9 @@ LOCATION_CONFIG = {
 }
 
 
-# --- DATA STORAGE FUNCTIONS (Google Sheets / Turso with CSV Fallback) ---
-def get_connection():
-  if HAS_GSHEETS:
-    try:
-      return st.connection("gsheets", type=GSheetsConnection)
-    except Exception:
-      return None
-  return None
-
-
+# --- DATA STORAGE FUNCTIONS (Turso with Local CSV Fallback) ---
 @st.cache_data(ttl=5)
 def load_data():
-  # Try loading from Turso first
   conn = get_turso_db()
   if conn is not None:
     try:
@@ -179,21 +149,13 @@ def load_data():
           "Motorcycle_Count",
           "Photo_Path",
       ]
-      return pd.DataFrame(rows, columns=cols)
+      df_turso = pd.DataFrame(rows, columns=cols)
+      if not df_turso.empty:
+        return df_turso
     except Exception:
       pass
 
-  # Fallback to Google Sheets
-  conn_gs = get_connection()
-  if conn_gs is not None:
-    try:
-      df = conn_gs.read(ttl="0d")
-      if not df.empty:
-        return df
-    except Exception:
-      pass
-
-  # Fallback to local CSV
+  # Fallback to local CSV if Turso is unreachable
   try:
     return pd.read_csv(FILENAME)
   except FileNotFoundError:
@@ -211,7 +173,7 @@ def load_data():
 
 
 def save_data(new_entries_df):
-  # 1. Save to Turso Cloud DB if configured
+  # 1. Save to Turso Cloud DB
   conn = get_turso_db()
   if conn is not None:
     try:
@@ -224,30 +186,20 @@ def save_data(new_entries_df):
             (
                 entry["Timestamp"],
                 entry["Date"],
-                entry["Week_Number"],
+                int(entry["Week_Number"]),
                 entry["Location"],
                 entry["Service"],
                 entry["Parking_Area"],
-                entry["Car_Count"],
-                entry["Motorcycle_Count"],
+                int(entry["Car_Count"]),
+                int(entry["Motorcycle_Count"]),
                 entry["Photo_Path"],
             ),
         )
       conn.commit()
     except Exception as e:
-      st.warning(f"Turso update failed: {e}")
+      st.warning(f"Turso cloud sync warning: {e}")
 
-  # 2. Save to Google Sheets if connected
-  conn_gs = get_connection()
-  if conn_gs is not None:
-    try:
-      existing_df = conn_gs.read(ttl="0d")
-      updated_df = pd.concat([existing_df, new_entries_df], ignore_index=True)
-      conn_gs.update(data=updated_df)
-    except Exception as e:
-      st.warning(f"Google Sheets update failed: {e}")
-
-  # 3. Always maintain local CSV backup
+  # 2. Maintain local CSV backup
   try:
     if os.path.exists(FILENAME):
       df = pd.read_csv(FILENAME)
@@ -437,322 +389,4 @@ if menu == "Log Parking Counts":
             "Timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
             "Date": log_date.strftime("%Y-%m-%d"),
             "Week_Number": int(week_num),
-            "Location": selected_location,
-            "Service": selected_service,
-            "Parking_Area": area,
-            "Car_Count": int(vals["cars"]),
-            "Motorcycle_Count": int(vals["motors"]),
-            "Photo_Path": saved_image_path,
-        })
-
-      new_df = pd.DataFrame(new_entries)
-
-      try:
-        save_data(new_df)
-        st.cache_data.clear()
-        st.success(
-            f"Successfully saved counts for {selected_location} -"
-            f" {selected_service} (Assigned to Week {week_num})! Form reset to"
-            " 0."
-        )
-      except Exception as e:
-        st.error(f"Error saving data: {e}")
-
-# --- TAB 2: VIEW WEEKLY REPORT ---
-elif menu == "View Weekly Report":
-  st.header("📊 Weekly Summary Report")
-
-  df = load_data()
-
-  if df.empty:
-    st.info("No parking logs found yet.")
-  else:
-    today = datetime.now()
-    if today.weekday() == 6:
-      curr_calc_date = today - timedelta(days=1)
-    else:
-      curr_calc_date = today
-
-    current_week = curr_calc_date.isocalendar()[1]
-
-    selected_week = st.number_input(
-        "Select Week Number:",
-        min_value=1,
-        max_value=53,
-        value=int(current_week),
-    )
-
-    filtered_df = df[df["Week_Number"] == selected_week]
-
-    if filtered_df.empty:
-      st.warning(f"No records found for Week {selected_week}.")
-    else:
-      report_location = st.selectbox(
-          "Filter Report by Location:",
-          ["All Locations"] + list(LOCATION_CONFIG.keys()),
-      )
-
-      if report_location != "All Locations":
-        filtered_df = filtered_df[filtered_df["Location"] == report_location]
-
-      if filtered_df.empty:
-        st.warning(
-            f"No records found for {report_location} in Week {selected_week}."
-        )
-      else:
-        filtered_df["Total_Vehicles"] = (
-            filtered_df["Car_Count"] + filtered_df["Motorcycle_Count"]
-        )
-
-        st.subheader(f"Summary Breakdown for Week {selected_week}")
-
-        summary_table = (
-            filtered_df.groupby(["Location", "Parking_Area"])[
-                ["Car_Count", "Motorcycle_Count", "Total_Vehicles"]
-            ]
-            .sum()
-            .reset_index()
-        )
-
-        if report_location != "All Locations":
-          custom_order = LOCATION_CONFIG[report_location]["areas"]
-          summary_table["Parking_Area"] = pd.Categorical(
-              summary_table["Parking_Area"],
-              categories=custom_order,
-              ordered=True,
-          )
-          summary_table = summary_table.sort_values("Parking_Area")
-
-        summary_table.columns = [
-            "Location",
-            "Parking Area",
-            "Cars",
-            "Motorcycles",
-            "Total Vehicles",
-        ]
-
-        st.dataframe(summary_table, use_container_width=True)
-
-        total_cars = filtered_df["Car_Count"].sum()
-        total_motors = filtered_df["Motorcycle_Count"].sum()
-        grand_total = filtered_df["Total_Vehicles"].sum()
-
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Cars", total_cars)
-        col2.metric("Total Motorcycles", total_motors)
-        col3.metric("Combined Grand Total", grand_total)
-
-        csv_data = summary_table.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="📥 Download Weekly Report (CSV)",
-            data=csv_data,
-            file_name=(
-                f"tapat_weekly_report_week_{selected_week}_{report_location.replace(' ', '_')}.csv"
-            ),
-            mime="text/csv",
-        )
-
-# --- TAB 3: SUMMARY DASHBOARD ---
-elif menu == "Summary Dashboard":
-  st.header("📈 Weekly Parking Report")
-  st.caption(
-      "Executive overview of service-by-service vehicle counts and location"
-      " subtotals."
-  )
-
-  if not is_leadership_view:
-    with st.expander("🔗 Share Leadership Link"):
-      st.info(
-          "Send this direct link to church leadership so they can view only the"
-          " clean summary dashboard:"
-      )
-      st.code(
-          "https://tapat-parking-tracker.streamlit.app/?view=leadership",
-          language="text",
-      )
-
-  df = load_data()
-
-  if df.empty:
-    st.info("No parking logs recorded yet.")
-  else:
-    col_week, col_loc = st.columns(2)
-
-    today = datetime.now()
-    if today.weekday() == 6:
-      curr_calc_date = today - timedelta(days=1)
-    else:
-      curr_calc_date = today
-
-    current_week = curr_calc_date.isocalendar()[1]
-
-    with col_week:
-      selected_week = st.number_input(
-          "Select Week Number:",
-          min_value=1,
-          max_value=53,
-          value=int(current_week),
-          key="dash_week",
-      )
-
-    with col_loc:
-      selected_dash_loc = st.selectbox(
-          "Filter by Church Location:",
-          ["All Locations"] + list(LOCATION_CONFIG.keys()),
-          key="dash_loc_filter",
-      )
-
-    week_df = df[df["Week_Number"] == selected_week]
-
-    if week_df.empty:
-      st.warning(f"No records found for Week {selected_week}.")
-    else:
-      if selected_dash_loc != "All Locations":
-        filtered_dash_df = week_df[week_df["Location"] == selected_dash_loc]
-      else:
-        filtered_dash_df = week_df
-
-      if filtered_dash_df.empty:
-        st.warning(
-            f"No records logged for {selected_dash_loc} in Week {selected_week}."
-        )
-      else:
-        total_cars_all = filtered_dash_df["Car_Count"].sum()
-        total_motors_all = filtered_dash_df["Motorcycle_Count"].sum()
-        grand_total_vehicles = total_cars_all + total_motors_all
-
-        st.markdown("---")
-        st.subheader("🌐 Overall Summary")
-
-        c1, c2, c3 = st.columns(3)
-        with c1:
-          st.metric("🚘 Total Cars", f"{total_cars_all:,}")
-        with c2:
-          st.metric("🛵 Total Motorcycles", f"{total_motors_all:,}")
-        with c3:
-          st.metric("📊 Grand Total Vehicles", f"{grand_total_vehicles:,}")
-
-        st.markdown("---")
-
-        if selected_dash_loc == "All Locations":
-          target_locations = list(LOCATION_CONFIG.keys())
-        else:
-          target_locations = [selected_dash_loc]
-
-        for loc in target_locations:
-          loc_df = week_df[week_df["Location"] == loc]
-
-          if not loc_df.empty:
-            with st.container(border=True):
-              st.markdown(f"### 📍 {loc}")
-
-              service_grouped = (
-                  loc_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
-                  .sum()
-                  .reset_index()
-              )
-
-              config_services = LOCATION_CONFIG[loc]["services"]
-              service_grouped["Service"] = pd.Categorical(
-                  service_grouped["Service"],
-                  categories=config_services,
-                  ordered=True,
-              )
-              service_grouped = service_grouped.sort_values("Service")
-
-              loc_cars = 0
-              loc_motors = 0
-
-              for _, row in service_grouped.iterrows():
-                svc = row["Service"]
-                c = int(row["Car_Count"])
-                m = int(row["Motorcycle_Count"])
-                tot = c + m
-                loc_cars += c
-                loc_motors += m
-
-                st.write(
-                    f"• **{svc}:** {c:,} Cars | {m:,} Motorcycles *(Total:"
-                    f" {tot:,})*"
-                )
-
-              loc_combined = loc_cars + loc_motors
-              st.success(
-                  f"**{loc} Subtotal:** {loc_cars:,} Cars + {loc_motors:,}"
-                  f" Motorcycles = **{loc_combined:,} Total Vehicles**"
-              )
-
-# --- SECRET TAB 4: DATA VERIFICATION (ADMIN ONLY) ---
-elif menu == "Data Verification" and getattr(
-    st.session_state, "is_admin", False
-):
-  st.header("🔒 Admin Data Verification Log")
-  st.caption(
-      "Clean single-line entries showing timestamps, locations, and total"
-      " vehicle counts."
-  )
-
-  df_verify = load_data()
-
-  if df_verify.empty:
-    st.info("No parking log entries found.")
-  else:
-    st.markdown("---")
-
-    grouped_entries = (
-        df_verify.groupby(["Timestamp", "Date", "Location", "Service"])[
-            ["Car_Count", "Motorcycle_Count"]
-        ]
-        .sum()
-        .reset_index()
-    )
-
-    for idx, row in grouped_entries.iloc[::-1].iterrows():
-      ts = row["Timestamp"]
-      dt = row["Date"]
-      loc = row["Location"]
-      svc = row["Service"]
-      cars = int(row["Car_Count"])
-      motors = int(row["Motorcycle_Count"])
-      tot = cars + motors
-
-      col_text, col_btn = st.columns([5, 1])
-
-      with col_text:
-        st.markdown(
-            f"🕒 **`{ts}`** | 📍 **{loc}** ({svc}) — Date: `{dt}` | 🚘"
-            f" `{cars}` Cars | 🛵 `{motors}` Motors | **Total: {tot}**"
-        )
-
-      with col_btn:
-        if st.button("🗑️ Delete", key=f"del_submission_{idx}"):
-          # Delete from Turso if connected
-          conn = get_turso_db()
-          if conn is not None:
-            try:
-              conn.execute(
-                  "DELETE FROM parking_logs WHERE Timestamp = ?", (ts,)
-              )
-              conn.commit()
-            except Exception:
-              pass
-
-          # Delete row locally & update CSV
-          df_verify = df_verify[df_verify["Timestamp"] != ts].reset_index(
-              drop=True
-          )
-          df_verify.to_csv(FILENAME, index=False)
-
-          # Delete from Google Sheets if connected
-          conn_gs = get_connection()
-          if conn_gs is not None:
-            try:
-              conn_gs.update(data=df_verify)
-            except Exception:
-              pass
-
-          st.cache_data.clear()
-          st.success("Deleted submission entry!")
-          st.rerun()
-
-      st.markdown("---")
+            "Location
