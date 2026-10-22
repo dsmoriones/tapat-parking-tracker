@@ -9,12 +9,15 @@ try:
   import libsql
 
   HAS_TURSO = True
-except ImportError:
+  TURSO_IMPORT_ERROR = None
+except Exception as e:
   HAS_TURSO = False
+  TURSO_IMPORT_ERROR = str(e)
 
 # --- TURSO CREDENTIALS & DB SETUP ---
-TURSO_DB_URL = "libsql://tapat-parking-db-dsmoriones.aws-eu-west-1.turso.io"
-TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI2Nzc5MjIsImlkIjoiMDFhMTYzZGEtMWQwMS03NjFjLTkxNGEtZmNhZjMxM2ZlMjdjIiwia2lkIjoiWk00cjVhRGMxMFYxY2Z4amJGa2YtRjZHR2VmeW9ybEt5eHVJMEpXS0tYdyIsInJpZCI6ImEwZWYxNGIwLWU0MDUtNGE1MS1iNWUxLTRjYTQ1YmZhMjI2NSJ9.oeccaQkYXajijm-mF4aJHz0DqmLXHRJDLmhOjri-O23J4or6f5KRsDoKuRLAtgIGFMg4or6uRPNCBbMqiV8PCg"
+# Fixed to use https:// protocol required by remote libsql drivers
+TURSO_DB_URL = "https://tapat-parking-db-dsmoriones.aws-eu-west-1.turso.io"
+TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI2NzY5OTAsImlkIjoiMDFhMTYzZGEtMWQwMS03NjFjLTkxNGEtZmNhZjMxM2ZlMjdjIiwia2lkIjoiWk00cjVhRGMxMFYxY2Z4amJGa2YtRjZHR2VmeW9ybEt5eHVJMEpXS0tYdyIsInJpZCI6ImEwZWYxNGIwLWU0MDUtNGE1MS1iNWUxLTRjYTQ1YmZhMjI2NSJ9.FdbibTGIxRUCg_solBxQSI4cMBE7fmaAeDAyhGboJxmyUQ_7OozW0voi7CFM4xLN9xisdkuYhDrbtZb_ygxsCQ"
 
 FILENAME = "tapat_parking_logs.csv"
 IMAGE_DIR = "uploaded_photos"
@@ -27,15 +30,16 @@ if not os.path.exists(IMAGE_DIR):
 
 def get_turso_db():
   if not HAS_TURSO:
-    return None
+    return None, f"libsql library not loaded: {TURSO_IMPORT_ERROR}"
   try:
-    return libsql.connect(database=TURSO_DB_URL, auth_token=TURSO_AUTH_TOKEN)
-  except Exception:
-    return None
+    conn = libsql.connect(database=TURSO_DB_URL, auth_token=TURSO_AUTH_TOKEN)
+    return conn, None
+  except Exception as e:
+    return None, str(e)
 
 
 def init_turso_db():
-  conn = get_turso_db()
+  conn, err = get_turso_db()
   if conn:
     try:
       conn.execute("""
@@ -133,7 +137,7 @@ LOCATION_CONFIG = {
 # --- DATA STORAGE FUNCTIONS (Turso with Local CSV Fallback) ---
 @st.cache_data(ttl=5)
 def load_data():
-  conn = get_turso_db()
+  conn, _ = get_turso_db()
   if conn is not None:
     try:
       res = conn.execute("SELECT * FROM parking_logs")
@@ -174,7 +178,7 @@ def load_data():
 
 def save_data(new_entries_df):
   # 1. Save to Turso Cloud DB
-  conn = get_turso_db()
+  conn, _ = get_turso_db()
   if conn is not None:
     try:
       for _, entry in new_entries_df.iterrows():
@@ -184,15 +188,15 @@ def save_data(new_entries_df):
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
             (
-                entry["Timestamp"],
-                entry["Date"],
+                str(entry["Timestamp"]),
+                str(entry["Date"]),
                 int(entry["Week_Number"]),
-                entry["Location"],
-                entry["Service"],
-                entry["Parking_Area"],
+                str(entry["Location"]),
+                str(entry["Service"]),
+                str(entry["Parking_Area"]),
                 int(entry["Car_Count"]),
                 int(entry["Motorcycle_Count"]),
-                entry["Photo_Path"],
+                str(entry["Photo_Path"]),
             ),
         )
       conn.commit()
@@ -282,10 +286,10 @@ else:
   menu = st.sidebar.radio("Go to", nav_options)
 
   with st.sidebar.expander("⚙️ App Customization"):
-    # --- QUICK TURSO STATUS INDICATOR ---
+    # --- QUICK TURSO STATUS INDICATOR & DIAGNOSTIC ---
     st.markdown("### ☁️ Cloud Database Status")
     if st.button("🔌 Test Connection", use_container_width=True):
-      conn = get_turso_db()
+      conn, err = get_turso_db()
       if conn is not None:
         try:
           res = conn.execute("SELECT COUNT(*) FROM parking_logs")
@@ -294,7 +298,7 @@ else:
         except Exception as e:
           st.warning(f"🟡 Connected, but table query failed: {e}")
       else:
-        st.error("🔴 Connection failed. Unable to reach Turso Cloud.")
+        st.error(f"🔴 Connection failed:\n`{err}`")
 
     st.markdown("---")
 
@@ -585,140 +589,3 @@ elif menu == "Summary Dashboard":
         filtered_dash_df = week_df[week_df["Location"] == selected_dash_loc]
       else:
         filtered_dash_df = week_df
-
-      if filtered_dash_df.empty:
-        st.warning(
-            f"No records logged for {selected_dash_loc} in Week {selected_week}."
-        )
-      else:
-        total_cars_all = filtered_dash_df["Car_Count"].sum()
-        total_motors_all = filtered_dash_df["Motorcycle_Count"].sum()
-        grand_total_vehicles = total_cars_all + total_motors_all
-
-        st.markdown("---")
-        st.subheader("🌐 Overall Summary")
-
-        c1, c2, c3 = st.columns(3)
-        with c1:
-          st.metric("🚘 Total Cars", f"{total_cars_all:,}")
-        with c2:
-          st.metric("🛵 Total Motorcycles", f"{total_motors_all:,}")
-        with c3:
-          st.metric("📊 Grand Total Vehicles", f"{grand_total_vehicles:,}")
-
-        st.markdown("---")
-
-        if selected_dash_loc == "All Locations":
-          target_locations = list(LOCATION_CONFIG.keys())
-        else:
-          target_locations = [selected_dash_loc]
-
-        for loc in target_locations:
-          loc_df = week_df[week_df["Location"] == loc]
-
-          if not loc_df.empty:
-            with st.container(border=True):
-              st.markdown(f"### 📍 {loc}")
-
-              service_grouped = (
-                  loc_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
-                  .sum()
-                  .reset_index()
-              )
-
-              config_services = LOCATION_CONFIG[loc]["services"]
-              service_grouped["Service"] = pd.Categorical(
-                  service_grouped["Service"],
-                  categories=config_services,
-                  ordered=True,
-              )
-              service_grouped = service_grouped.sort_values("Service")
-
-              loc_cars = 0
-              loc_motors = 0
-
-              for _, row in service_grouped.iterrows():
-                svc = row["Service"]
-                c = int(row["Car_Count"])
-                m = int(row["Motorcycle_Count"])
-                tot = c + m
-                loc_cars += c
-                loc_motors += m
-
-                st.write(
-                    f"• **{svc}:** {c:,} Cars | {m:,} Motorcycles *(Total:"
-                    f" {tot:,})*"
-                )
-
-              loc_combined = loc_cars + loc_motors
-              st.success(
-                  f"**{loc} Subtotal:** {loc_cars:,} Cars + {loc_motors:,}"
-                  f" Motorcycles = **{loc_combined:,} Total Vehicles**"
-              )
-
-# --- SECRET TAB 4: DATA VERIFICATION (ADMIN ONLY) ---
-elif menu == "Data Verification" and getattr(
-    st.session_state, "is_admin", False
-):
-  st.header("🔒 Admin Data Verification Log")
-  st.caption(
-      "Clean single-line entries showing timestamps, locations, and total"
-      " vehicle counts."
-  )
-
-  df_verify = load_data()
-
-  if df_verify.empty:
-    st.info("No parking log entries found.")
-  else:
-    st.markdown("---")
-
-    grouped_entries = (
-        df_verify.groupby(["Timestamp", "Date", "Location", "Service"])[
-            ["Car_Count", "Motorcycle_Count"]
-        ]
-        .sum()
-        .reset_index()
-    )
-
-    for idx, row in grouped_entries.iloc[::-1].iterrows():
-      ts = row["Timestamp"]
-      dt = row["Date"]
-      loc = row["Location"]
-      svc = row["Service"]
-      cars = int(row["Car_Count"])
-      motors = int(row["Motorcycle_Count"])
-      tot = cars + motors
-
-      col_text, col_btn = st.columns([5, 1])
-
-      with col_text:
-        st.markdown(
-            f"🕒 **`{ts}`** | 📍 **{loc}** ({svc}) — Date: `{dt}` | 🚘"
-            f" `{cars}` Cars | 🛵 `{motors}` Motors | **Total: {tot}**"
-        )
-
-      with col_btn:
-        if st.button("🗑️ Delete", key=f"del_submission_{idx}"):
-          # Delete from Turso Cloud DB
-          conn = get_turso_db()
-          if conn is not None:
-            try:
-              conn.execute(
-                  "DELETE FROM parking_logs WHERE Timestamp = ?", (ts,)
-              )
-              conn.commit()
-            except Exception:
-              pass
-
-          # Delete locally from CSV backup if exists
-          if os.path.exists(FILENAME):
-            df_csv = pd.read_csv(FILENAME)
-            df_csv = df_csv[df_csv["Timestamp"] != ts]
-            df_csv.to_csv(FILENAME, index=False)
-
-          st.cache_data.clear()
-          st.success("Deleted submission entry from cloud database!")
-          st.rerun()
-
-      st.markdown("---")
