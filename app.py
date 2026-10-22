@@ -1,8 +1,68 @@
-from datetime import datetime, timedelta
+# --- TURSO CLOUD DATABASE SETUP & INITIALIZATION ---
 import os
 import pandas as pd
-from PIL import Image
 import streamlit as st
+
+# Import Turso / libSQL driver
+try:
+  import libsql
+
+  HAS_TURSO = True
+except ImportError:
+  HAS_TURSO = False
+
+
+def get_turso_db():
+  if not HAS_TURSO:
+    st.error(
+        "libsql module not installed. Please add 'libsql-experimental' to"
+        " requirements.txt."
+    )
+    return None
+
+  db_url = st.secrets.get(
+      "TURSO_DATABASE_URL", os.environ.get("TURSO_DATABASE_URL")
+  )
+  auth_token = st.secrets.get(
+      "TURSO_AUTH_TOKEN", os.environ.get("TURSO_AUTH_TOKEN")
+  )
+
+  if not db_url or not auth_token:
+    st.error("Turso credentials missing from Streamlit secrets or environment.")
+    return None
+
+  return libsql.connect(database=db_url, auth_token=auth_token)
+
+
+def init_turso_db():
+  conn = get_turso_db()
+  if conn:
+    conn.execute("""
+            CREATE TABLE IF NOT EXISTS parking_logs (
+                Timestamp TEXT,
+                Date TEXT,
+                Week_Number INTEGER,
+                Location TEXT,
+                Service TEXT,
+                Parking_Area TEXT,
+                Car_Count INTEGER,
+                Motorcycle_Count INTEGER,
+                Photo_Path TEXT
+            )
+        """)
+    conn.commit()
+
+
+# Initialize Turso table on startup
+if HAS_TURSO:
+  try:
+    init_turso_db()
+  except Exception as e:
+    st.error(f"Turso database initialization error: {e}")
+
+# --- MAIN APP CODE BELOW ---
+from datetime import datetime, timedelta
+from PIL import Image
 
 # Optional cloud storage integration via streamlit-gsheets
 try:
@@ -90,7 +150,7 @@ LOCATION_CONFIG = {
 }
 
 
-# --- DATA STORAGE FUNCTIONS (Google Sheets with CSV Fallback) ---
+# --- DATA STORAGE FUNCTIONS (Google Sheets / Turso with CSV Fallback) ---
 def get_connection():
   if HAS_GSHEETS:
     try:
@@ -102,10 +162,32 @@ def get_connection():
 
 @st.cache_data(ttl=5)
 def load_data():
-  conn = get_connection()
+  # Try loading from Turso first
+  conn = get_turso_db()
   if conn is not None:
     try:
-      df = conn.read(ttl="0d")
+      res = conn.execute("SELECT * FROM parking_logs")
+      rows = res.fetchall()
+      cols = [
+          "Timestamp",
+          "Date",
+          "Week_Number",
+          "Location",
+          "Service",
+          "Parking_Area",
+          "Car_Count",
+          "Motorcycle_Count",
+          "Photo_Path",
+      ]
+      return pd.DataFrame(rows, columns=cols)
+    except Exception:
+      pass
+
+  # Fallback to Google Sheets
+  conn_gs = get_connection()
+  if conn_gs is not None:
+    try:
+      df = conn_gs.read(ttl="0d")
       if not df.empty:
         return df
     except Exception:
@@ -129,19 +211,43 @@ def load_data():
 
 
 def save_data(new_entries_df):
-  # 1. Save to Google Sheets if connected
-  conn = get_connection()
+  # 1. Save to Turso Cloud DB if configured
+  conn = get_turso_db()
   if conn is not None:
     try:
-      existing_df = conn.read(ttl="0d")
-      updated_df = pd.concat([existing_df, new_entries_df], ignore_index=True)
-      conn.update(data=updated_df)
+      for _, entry in new_entries_df.iterrows():
+        conn.execute(
+            """
+                    INSERT INTO parking_logs (Timestamp, Date, Week_Number, Location, Service, Parking_Area, Car_Count, Motorcycle_Count, Photo_Path)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+            (
+                entry["Timestamp"],
+                entry["Date"],
+                entry["Week_Number"],
+                entry["Location"],
+                entry["Service"],
+                entry["Parking_Area"],
+                entry["Car_Count"],
+                entry["Motorcycle_Count"],
+                entry["Photo_Path"],
+            ),
+        )
+      conn.commit()
     except Exception as e:
-      st.warning(
-          f"Google Sheets update failed: {e}. Saving to local backup CSV."
-      )
+      st.warning(f"Turso update failed: {e}")
 
-  # 2. Always maintain local CSV backup
+  # 2. Save to Google Sheets if connected
+  conn_gs = get_connection()
+  if conn_gs is not None:
+    try:
+      existing_df = conn_gs.read(ttl="0d")
+      updated_df = pd.concat([existing_df, new_entries_df], ignore_index=True)
+      conn_gs.update(data=updated_df)
+    except Exception as e:
+      st.warning(f"Google Sheets update failed: {e}")
+
+  # 3. Always maintain local CSV backup
   try:
     if os.path.exists(FILENAME):
       df = pd.read_csv(FILENAME)
@@ -448,7 +554,7 @@ elif menu == "View Weekly Report":
 
 # --- TAB 3: SUMMARY DASHBOARD ---
 elif menu == "Summary Dashboard":
-  st.header("📈 Weekly Parking Leadership Dashboard")
+  st.header("📈 Weekly Parking Report")
   st.caption(
       "Executive overview of service-by-service vehicle counts and location"
       " subtotals."
@@ -620,16 +726,28 @@ elif menu == "Data Verification" and getattr(
 
       with col_btn:
         if st.button("🗑️ Delete", key=f"del_submission_{idx}"):
-          # Delete row locally & update
+          # Delete from Turso if connected
+          conn = get_turso_db()
+          if conn is not None:
+            try:
+              conn.execute(
+                  "DELETE FROM parking_logs WHERE Timestamp = ?", (ts,)
+              )
+              conn.commit()
+            except Exception:
+              pass
+
+          # Delete row locally & update CSV
           df_verify = df_verify[df_verify["Timestamp"] != ts].reset_index(
               drop=True
           )
           df_verify.to_csv(FILENAME, index=False)
 
-          conn = get_connection()
-          if conn is not None:
+          # Delete from Google Sheets if connected
+          conn_gs = get_connection()
+          if conn_gs is not None:
             try:
-              conn.update(data=df_verify)
+              conn_gs.update(data=df_verify)
             except Exception:
               pass
 
