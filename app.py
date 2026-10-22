@@ -23,24 +23,6 @@ FILENAME = "tapat_parking_logs.csv"
 IMAGE_DIR = "uploaded_photos"
 HEADER_BANNER_PATH = "tapat_banner.png"
 
-# Capacity estimates per parking area (for visual capacity bars)
-AREA_CAPACITIES = {
-    "Parking 1": 50,
-    "Parking 2": 40,
-    "Parking 3": 35,
-    "Parking 4": 30,
-    "Parking 5": 25,
-    "Parking 6": 25,
-    "Parking 7": 20,
-    "Parking 8": 20,
-    "Parking 9": 15,
-    "Parking 10": 15,
-    "Basement": 60,
-    "Open Parking": 100,
-    "Main Parking": 80,
-    "BIR": 40,
-}
-
 # Ensure local storage directory exists
 if not os.path.exists(IMAGE_DIR):
   os.makedirs(IMAGE_DIR)
@@ -233,14 +215,15 @@ def kpi_card(title, value, icon, accent_color="#2563eb"):
   return f"""
     <div style="
         background-color: var(--background-secondary-color, #1e293b);
-        padding: 16px;
-        border-radius: 12px;
+        padding: 18px;
+        border-radius: 14px;
         border-top: 4px solid {accent_color};
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
         margin-bottom: 12px;
+        backdrop-filter: blur(8px);
     ">
-        <p style="margin: 0; font-size: 0.85rem; opacity: 0.8; font-weight: 500;">{icon} {title}</p>
-        <h2 style="margin: 4px 0 0 0; font-size: 1.8rem; font-weight: 700;">{value:,}</h2>
+        <p style="margin: 0; font-size: 0.85rem; opacity: 0.8; font-weight: 600;">{icon} {title}</p>
+        <h2 style="margin: 6px 0 0 0; font-size: 1.9rem; font-weight: 800; letter-spacing: -0.5px;">{value:,}</h2>
     </div>
     """
 
@@ -249,9 +232,9 @@ def status_badge(is_online=True):
   color = "#10b981" if is_online else "#f59e0b"
   label = "TURSO CLOUD ONLINE" if is_online else "LOCAL CSV BACKUP MODE"
   return f"""
-    <div style="display: inline-flex; align-items: center; gap: 6px; background-color: #1e293b; border: 1px solid #334155; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; margin-bottom: 15px;">
-        <span style="height: 8px; width: 8px; background-color: {color}; border-radius: 50%; display: inline-block;"></span>
-        <span style="color: #f8fafc;">{label}</span>
+    <div style="display: inline-flex; align-items: center; gap: 8px; background-color: rgba(30, 41, 59, 0.8); border: 1px solid rgba(51, 65, 85, 0.8); padding: 5px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+        <span style="height: 8px; width: 8px; background-color: {color}; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px {color};"></span>
+        <span style="color: #f8fafc; letter-spacing: 0.5px;">{label}</span>
     </div>
     """
 
@@ -259,31 +242,10 @@ def status_badge(is_online=True):
 def empty_state_card(message="No parking logs recorded for this selection."):
   st.markdown(
       f"""
-    <div style="text-align: center; padding: 30px; background-color: #1e293b; border-radius: 12px; border: 2px dashed #334155; margin: 15px 0;">
-        <p style="font-size: 2.2rem; margin-bottom: 8px;">📋</p>
-        <h4 style="margin: 0; opacity: 0.9; color: #f8fafc;">{message}</h4>
+    <div style="text-align: center; padding: 36px 20px; background-color: rgba(30, 41, 59, 0.6); border-radius: 14px; border: 2px dashed #334155; margin: 15px 0;">
+        <p style="font-size: 2.5rem; margin-bottom: 8px;">📋</p>
+        <h4 style="margin: 0; opacity: 0.95; color: #f8fafc; font-weight: 700;">{message}</h4>
         <p style="font-size: 0.85rem; opacity: 0.6; margin-top: 6px; color: #94a3b8;">Select another week/location or switch to "Log Parking Counts" to insert data.</p>
-    </div>
-    """,
-      unsafe_allow_html=True,
-  )
-
-
-def capacity_progress_bar(area_name, current_count, capacity):
-  percentage = min(int((current_count / max(1, capacity)) * 100), 100)
-  color = (
-      "#10b981" if percentage < 70 else "#f59e0b" if percentage < 90 else "#ef4444"
-  )
-  st.markdown(
-      f"""
-    <div style="margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">
-            <span>🅿️ {area_name}</span>
-            <span>{current_count} / {capacity} vehicles ({percentage}%)</span>
-        </div>
-        <div style="background-color: #334155; border-radius: 8px; height: 10px; width: 100%;">
-            <div style="background-color: {color}; width: {percentage}%; height: 100%; border-radius: 8px; transition: width 0.4s ease;"></div>
-        </div>
     </div>
     """,
       unsafe_allow_html=True,
@@ -294,26 +256,45 @@ st.set_page_config(
     page_title="TAPAT Parking Tracker", page_icon="🚗", layout="centered"
 )
 
-# --- MODERN ENHANCED UI STYLING & POLISHED CARDS ---
+# --- MODERN ADVANCED STYLING & GLASSMORPHISM INJECTION ---
 st.markdown(
     """
     <style>
+        /* Smooth Page Background */
+        .stApp {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        }
+        
+        /* Metric Cards Customization */
         [data-testid="stMetric"] {
-            background-color: var(--background-secondary-color, #1e293b);
+            background-color: rgba(30, 41, 59, 0.75);
             padding: 16px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border: 1px solid var(--border-color, #334155);
+            border-radius: 14px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(51, 65, 85, 0.8);
+            backdrop-filter: blur(8px);
         }
+        
+        /* Button Hover Animations */
         .stButton>button {
-            border-radius: 8px;
+            border-radius: 10px;
             font-weight: 600;
+            transition: all 0.2s ease-in-out !important;
         }
+        .stButton>button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(37, 99, 235, 0.3);
+        }
+
+        /* Container Border Glow */
         div[data-testid="stVerticalBlock"] > div[style*="border"] {
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 12px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 14px;
+            background: rgba(30, 41, 59, 0.6) !important;
+            border: 1px solid rgba(51, 65, 85, 0.8) !important;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
         }
     </style>
 """,
@@ -359,7 +340,7 @@ else:
 
   menu = st.sidebar.radio("Navigate to:", nav_options)
 
-  st.sidebar.markdown("---")
+  st.sidebar.divider()
   if not st.session_state.is_admin:
     with st.sidebar.expander("🔑 Admin Access"):
       entered_pass = st.text_input(
@@ -389,7 +370,7 @@ else:
         else:
           st.error(f"🔴 Connection failed:\n`{err}`")
 
-      st.markdown("---")
+      st.divider()
       custom_banner = st.file_uploader(
           "Upload Header Banner", type=["png", "jpg", "jpeg"]
       )
@@ -398,7 +379,7 @@ else:
         banner_img.save(HEADER_BANNER_PATH)
         st.success("Header banner updated!")
 
-      st.markdown("---")
+      st.divider()
       if st.button("🗑️ Clear Local Backup CSV", use_container_width=True):
         if os.path.exists(FILENAME):
           os.remove(FILENAME)
@@ -406,7 +387,7 @@ else:
           st.success("Backup logs cleared!")
           st.rerun()
 
-      st.markdown("---")
+      st.divider()
       if st.button("🔒 Lock Admin Access", use_container_width=True):
         st.session_state.is_admin = False
         st.rerun()
@@ -421,24 +402,30 @@ st.markdown(status_badge(HAS_TURSO), unsafe_allow_html=True)
 
 # --- TAB 1: LOG PARKING COUNTS ---
 if menu == "Log Parking Counts":
-  st.header("📝 Log Parking Counts")
+  st.header("📝 Log Parking Counts", anchor=False)
 
   if "success_message" in st.session_state:
-    st.success(st.session_state["success_message"])
+    st.success(st.session_state["success_message"], icon="✅")
     del st.session_state["success_message"]
 
-  # Location selection header card
+  # Location & Service selection header card
   with st.container(border=True):
-    c1, c2 = st.columns(2)
-    with c1:
-      selected_location = st.selectbox(
-          "📍 Church Location:", list(LOCATION_CONFIG.keys())
-      )
-      active_services = LOCATION_CONFIG[selected_location]["services"]
-      active_parking_areas = LOCATION_CONFIG[selected_location]["areas"]
-    with c2:
-      selected_service = st.selectbox("⛪ Worship Service:", active_services)
-      log_date = st.date_input("📅 Date", datetime.now())
+    selected_location = st.selectbox(
+        "📍 Church Location:", list(LOCATION_CONFIG.keys())
+    )
+    active_services = LOCATION_CONFIG[selected_location]["services"]
+    active_parking_areas = LOCATION_CONFIG[selected_location]["areas"]
+
+    st.markdown("##### ⛪ Worship Service:")
+    selected_service = st.segmented_control(
+        "Select Service",
+        options=active_services,
+        selection_mode="single",
+        default=active_services[0],
+        label_visibility="collapsed",
+    )
+
+    log_date = st.date_input("📅 Log Date", datetime.now())
 
   st.markdown("### 🚘 Area Count Inputs")
 
@@ -470,7 +457,10 @@ if menu == "Log Parking Counts":
     )
 
     submit_button = st.form_submit_button(
-        label="💾 Submit All Counts", use_container_width=True, type="primary"
+        label="Submit All Counts",
+        icon=":material/cloud_upload:",
+        use_container_width=True,
+        type="primary",
     )
 
     if submit_button:
@@ -510,8 +500,8 @@ if menu == "Log Parking Counts":
         save_data(new_df)
         st.cache_data.clear()
         st.session_state["success_message"] = (
-            f"✅ Saved counts for {selected_location} - {selected_service}"
-            f" (Week {week_num})!"
+            f"Saved counts for {selected_location} - {selected_service} (Week"
+            f" {week_num})!"
         )
         st.rerun()
       except Exception as e:
@@ -519,7 +509,7 @@ if menu == "Log Parking Counts":
 
 # --- TAB 2: VIEW WEEKLY REPORT ---
 elif menu == "View Weekly Report":
-  st.header("📊 Weekly Summary Report")
+  st.header("📊 Weekly Summary Report", anchor=False)
 
   df = load_data()
 
@@ -608,20 +598,13 @@ elif menu == "View Weekly Report":
             unsafe_allow_html=True,
         )
 
-      st.markdown("### 📊 Area Occupancy Progress")
-      for _, row in summary_table.iterrows():
-        area = row["Parking Area"]
-        tot = row["Total Vehicles"]
-        cap = AREA_CAPACITIES.get(area, 50)
-        capacity_progress_bar(area, tot, cap)
-
       st.markdown("### 📈 Vehicle Breakdown Chart")
       chart_data = summary_table.set_index("Parking Area")[
           ["Cars", "Motorcycles"]
       ]
       st.bar_chart(chart_data, color=["#3b82f6", "#10b981"], height=280)
 
-      st.markdown("---")
+      st.divider()
 
       # Export format dataset
       export_df = summary_table.copy()
@@ -644,7 +627,8 @@ elif menu == "View Weekly Report":
       with dl_col1:
         csv_data = summary_table.to_csv(index=False).encode("utf-8")
         st.download_button(
-            label="📥 Export CSV Report",
+            label="Export CSV Report",
+            icon=":material/download:",
             data=csv_data,
             file_name=(
                 f"tapat_report_week_{selected_week}_{report_location.replace(' ', '_')}.csv"
@@ -660,7 +644,8 @@ elif menu == "View Weekly Report":
         excel_data = excel_buffer.getvalue()
 
         st.download_button(
-            label="📥 Export Excel Report (.xlsx)",
+            label="Export Excel Report (.xlsx)",
+            icon=":material/description:",
             data=excel_data,
             file_name=(
                 f"tapat_report_week_{selected_week}_{report_location.replace(' ', '_')}.xlsx"
@@ -674,7 +659,7 @@ elif menu == "View Weekly Report":
 
 # --- TAB 3: SUMMARY DASHBOARD ---
 elif menu == "Summary Dashboard":
-  st.header("📈 Leadership Executive Dashboard")
+  st.header("📈 Leadership Executive Dashboard", anchor=False)
 
   if not is_leadership_view:
     with st.expander("🔗 Share Clean Executive Link"):
@@ -733,7 +718,7 @@ elif menu == "Summary Dashboard":
         total_motors_all = filtered_dash_df["Motorcycle_Count"].sum()
         grand_total_vehicles = total_cars_all + total_motors_all
 
-        st.markdown("---")
+        st.divider()
         c1, c2, c3 = st.columns(3)
         with c1:
           st.markdown(
@@ -753,7 +738,7 @@ elif menu == "Summary Dashboard":
               unsafe_allow_html=True,
           )
 
-        st.markdown("---")
+        st.divider()
 
         target_locations = (
             list(LOCATION_CONFIG.keys())
@@ -808,14 +793,14 @@ elif menu == "Summary Dashboard":
 elif menu == "Data Verification" and getattr(
     st.session_state, "is_admin", False
 ):
-  st.header("🔒 Admin Data Verification Log")
+  st.header("🔒 Admin Data Verification Log", anchor=False)
 
   df_verify = load_data()
 
   if df_verify.empty:
     empty_state_card("No parking log entries found.")
   else:
-    st.markdown("---")
+    st.divider()
 
     grouped_entries = (
         df_verify.groupby(["Timestamp", "Date", "Location", "Service"])[
