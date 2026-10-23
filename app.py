@@ -63,10 +63,6 @@ def init_turso_db():
 if HAS_TURSO:
   init_turso_db()
 
-# Initialize session state for default special event label template
-if "special_event_default" not in st.session_state:
-  st.session_state.special_event_default = "Special Event"
-
 # Location configuration
 LOCATION_CONFIG = {
     "COG Dasma - Main": {
@@ -95,7 +91,7 @@ LOCATION_CONFIG = {
             "Tuesday Worship Service",
             "Salvation Night",
             "Empowered Night",
-            st.session_state.special_event_default,
+            "Special Event",
         ],
     },
     "COG Jabez": {
@@ -376,16 +372,6 @@ else:
           st.error(f"🔴 Connection failed:\n`{err}`")
 
       st.divider()
-      st.markdown("#### 🎪 Default Special Event Label")
-      new_event_title = st.text_input(
-          "Set Default Label:", value=st.session_state.special_event_default
-      )
-      if st.button("Update Default Label", use_container_width=True):
-        st.session_state.special_event_default = new_event_title.strip()
-        st.success(f"Default Special Event set to: '{new_event_title}'")
-        st.rerun()
-
-      st.divider()
       custom_banner = st.file_uploader(
           "Upload Header Banner", type=["png", "jpg", "jpeg"]
       )
@@ -443,19 +429,16 @@ if menu == "Log Parking Counts":
         label_visibility="collapsed",
     )
 
-    # Allow custom dynamic naming if a Special Event choice is chosen
-    if (
-        selected_service_choice == st.session_state.special_event_default
-        or "Special Event" in str(selected_service_choice)
-    ):
+    # Show text box ONLY when 'Special Event' is chosen
+    if selected_service_choice == "Special Event":
       custom_event_name = st.text_input(
           "📝 Enter Specific Event Title (for this Date/Week):",
-          value=f"Special Event - {datetime.now().strftime('%b %d')}",
+          placeholder="e.g., Youth Camp 2026, Anniversary Service",
       )
       final_service_name = (
           custom_event_name.strip()
           if custom_event_name.strip()
-          else selected_service_choice
+          else "Special Event"
       )
     else:
       final_service_name = selected_service_choice
@@ -808,7 +791,7 @@ elif menu == "Summary Dashboard":
                   .reset_index()
               )
 
-              # Include logged dynamic event names in sorting category order
+              # Include dynamic event names in category sorting order
               config_services = (
                   LOCATION_CONFIG[loc]["services"]
                   + list(
