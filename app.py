@@ -212,7 +212,7 @@ def save_data(new_entries_df):
         st.error(f"Error saving to local CSV: {e}")
 
 
-# --- PROFESSIONAL CHURCH UI COMPONENTS ---
+# --- PROFESSIONAL UI COMPONENTS ---
 def render_kpi_card(title, value, icon, gradient):
     return f"""
     <div class="kpi-card-pro">
@@ -228,31 +228,29 @@ def render_kpi_card(title, value, icon, gradient):
 
 def render_status_header(is_online=True):
     status_color = "#10b981" if is_online else "#f59e0b"
-    status_label = "CLOUD SYNC ACTIVE" if is_online else "OFFLINE BACKUP MODE"
+    status_label = "TURSO CLOUD ONLINE" if is_online else "LOCAL CSV BACKUP MODE"
     return f"""
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 10px;">
             <div class="status-pill">
                 <span class="pulse-dot" style="background-color: {status_color}; box-shadow: 0 0 10px {status_color};"></span>
                 <span style="color: #f8fafc; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.5px;">{status_label}</span>
             </div>
             <div class="status-pill" style="border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1);">
-                <span style="color: #60a5fa; font-weight: 700; font-size: 0.75rem;">🙏 TAPAT Ministry Portal</span>
+                <span style="color: #60a5fa; font-weight: 700; font-size: 0.75rem;">🚗 TAPAT ENGINE v2.5</span>
             </div>
         </div>
     </div>
     """
 
 
-def empty_state_card(
-    message="No parking logs recorded for this week yet. Ready for service!"
-):
+def empty_state_card(message="No parking logs recorded for this selection."):
     st.markdown(
         f"""
     <div style="text-align: center; padding: 48px 24px; background: rgba(30, 41, 59, 0.35); border-radius: 20px; border: 2px dashed rgba(51, 65, 85, 0.8); margin: 24px 0; backdrop-filter: blur(12px);">
-        <div style="font-size: 3rem; margin-bottom: 12px;">🚗</div>
+        <div style="font-size: 3rem; margin-bottom: 12px;">📊</div>
         <h3 style="margin: 0; color: #f8fafc; font-weight: 800; font-size: 1.2rem;">{message}</h3>
-        <p style="font-size: 0.88rem; color: #94a3b8; margin-top: 6px;">Select another week/location or switch to "Log Parking Counts" to begin recording.</p>
+        <p style="font-size: 0.88rem; color: #94a3b8; margin-top: 6px;">Select another week/location or switch to "Log Parking Counts" to insert data.</p>
     </div>
     """,
         unsafe_allow_html=True,
@@ -261,25 +259,28 @@ def empty_state_card(
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="TAPAT Parking & Stewardship Ministry",
+    page_title="TAPAT Parking Management",
     page_icon="🚗",
     layout="centered",
     initial_sidebar_state="expanded",
 )
 
-# --- MODERN CHURCH SAAS STYLING INJECTION ---
+# --- MODERN ADVANCED STYLING & GLASSMORPHISM INJECTION ---
 st.markdown(
     """
     <style>
+        /* Import Google Font Inter */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
+        /* Global Theme Reset */
         .stApp {
-            background: radial-gradient(circle at 50% -10%, #0f172a 0%, #020617 85%) !important;
+            background: radial-gradient(circle at 50% -10%, #1e293b 0%, #0f172a 85%) !important;
             font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
         }
 
+        /* Glassmorphic Container Cards */
         div[data-testid="stVerticalBlock"] > div[style*="border"] {
-            background: rgba(30, 41, 59, 0.4) !important;
+            background: rgba(30, 41, 59, 0.45) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             border-radius: 20px !important;
             box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.5) !important;
@@ -287,6 +288,7 @@ st.markdown(
             padding: 24px !important;
         }
 
+        /* KPI Card Component Styles */
         .kpi-card-pro {
             background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.9) 100%);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -301,7 +303,7 @@ st.markdown(
         }
         .kpi-card-pro:hover {
             transform: translateY(-4px);
-            box-shadow: 0 20px 40px -12px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 20px 40px -12px rgba(37, 99, 235, 0.3);
             border-color: rgba(255, 255, 255, 0.2);
         }
         .kpi-top-bar {
@@ -331,11 +333,12 @@ st.markdown(
             letter-spacing: -1.2px;
         }
 
+        /* Pulsing Status Pill */
         .status-pill {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(30, 41, 59, 0.8);
             border: 1px solid rgba(255, 255, 255, 0.12);
             padding: 6px 16px;
             border-radius: 30px;
@@ -354,12 +357,14 @@ st.markdown(
             100% { transform: scale(0.95); opacity: 0.8; }
         }
 
+        /* Input Controls Refinement */
         div[data-baseweb="input"], div[data-baseweb="select"] {
             border-radius: 12px !important;
             border: 1px solid rgba(255, 255, 255, 0.12) !important;
             background-color: rgba(15, 23, 42, 0.6) !important;
         }
 
+        /* Button Hover Animations */
         .stButton>button {
             border-radius: 12px !important;
             font-weight: 700 !important;
@@ -368,11 +373,12 @@ st.markdown(
         }
         .stButton>button:hover {
             transform: translateY(-2px) !important;
-            box-shadow: 0 10px 24px rgba(59, 130, 246, 0.4) !important;
+            box-shadow: 0 10px 24px rgba(37, 99, 235, 0.4) !important;
         }
 
+        /* Clean Sidebar Styling */
         section[data-testid="stSidebar"] {
-            background-color: rgba(15, 23, 42, 0.95) !important;
+            background-color: rgba(15, 23, 42, 0.9) !important;
             backdrop-filter: blur(20px) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
         }
@@ -408,7 +414,7 @@ else:
     if "is_admin" not in st.session_state:
         st.session_state.is_admin = False
 
-    st.sidebar.title("📌 Ministry Navigation")
+    st.sidebar.title("📌 Main Navigation")
 
     nav_options = [
         "Log Parking Counts",
@@ -422,7 +428,7 @@ else:
 
     st.sidebar.divider()
     if not st.session_state.is_admin:
-        with st.sidebar.expander("🔑 Admin Login"):
+        with st.sidebar.expander("🔑 System Admin"):
             entered_pass = st.text_input(
                 "Password", type="password", key="admin_pass_input"
             )
@@ -472,11 +478,11 @@ else:
                 st.session_state.is_admin = False
                 st.rerun()
 
-# --- HEADER HERO BANNER & WELCOME CARD ---
+# --- HEADER HERO BANNER ---
 if os.path.exists(HEADER_BANNER_PATH):
     st.image(HEADER_BANNER_PATH, use_container_width=True)
 else:
-    st.title("🚗 TAPAT PARKING & STEWARDSHIP MINISTRY")
+    st.title("🚗 TAPAT PARKING MANAGEMENT SYSTEM")
 
 st.markdown(render_status_header(HAS_TURSO), unsafe_allow_html=True)
 
@@ -487,16 +493,6 @@ if menu == "Log Parking Counts":
     st.markdown("<div id='top_anchor'></div>", unsafe_allow_html=True)
 
     st.header("📝 Log Parking Counts", anchor=False)
-    st.markdown(
-        """
-        <div style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 0 12px 12px 0; margin-bottom: 20px;">
-            <p style="margin: 0; font-size: 0.88rem; color: #93c5fd; font-weight: 500;">
-                🙏 <b>Volunteer Reminder:</b> Thank you for serving faithfully today! Please enter accurate counts per parking zone to help church leadership evaluate attendance and traffic flow.
-            </p>
-        </div>
-    """,
-        unsafe_allow_html=True,
-    )
 
     if "success_message" in st.session_state:
         st.success(st.session_state["success_message"], icon="✅")
@@ -507,10 +503,10 @@ if menu == "Log Parking Counts":
         col_loc, col_date = st.columns([3, 2])
         with col_loc:
             selected_location = st.selectbox(
-                "📍 Select Church Campus:", list(LOCATION_CONFIG.keys())
+                "📍 Select Location:", list(LOCATION_CONFIG.keys())
             )
         with col_date:
-            log_date = st.date_input("📅 Service Date", datetime.now())
+            log_date = st.date_input("📅 Log Date", datetime.now())
 
         active_services = LOCATION_CONFIG[selected_location]["services"]
         active_parking_areas = LOCATION_CONFIG[selected_location]["areas"]
@@ -524,6 +520,7 @@ if menu == "Log Parking Counts":
             label_visibility="collapsed",
         )
 
+        # Show dynamic text input strictly when 'Special Event' is chosen
         if selected_service_choice == "Special Event":
             custom_event_name = st.text_input(
                 "📝 Enter Specific Event Title (for this Date/Week):",
@@ -542,6 +539,7 @@ if menu == "Log Parking Counts":
     with st.form("table_entry_form", clear_on_submit=True):
         counts_data = {}
 
+        # Render area cards in a clean 2-column responsive layout grid
         for i in range(0, len(active_parking_areas), 2):
             cols = st.columns(2)
             for j in range(2):
@@ -612,8 +610,8 @@ if menu == "Log Parking Counts":
                 save_data(new_df)
                 st.cache_data.clear()
                 st.session_state["success_message"] = (
-                    f"Successfully recorded counts for {selected_location} —"
-                    f" {final_service_name} (Week {week_num})!"
+                    f"Saved counts for {selected_location} - {final_service_name} (Week"
+                    f" {week_num})!"
                 )
 
                 st.components.v1.html(
@@ -641,7 +639,7 @@ elif menu == "View Weekly Report":
     df = load_data()
 
     if df.empty:
-        empty_state_card("No parking logs recorded yet.")
+        empty_state_card("No parking logs found yet.")
     else:
         today = datetime.now()
         if today.weekday() == 6:
@@ -817,17 +815,7 @@ elif menu == "View Weekly Report":
 # TAB 3: SUMMARY DASHBOARD
 # ==========================================
 elif menu == "Summary Dashboard":
-    st.header("📈 Leadership Executive Dashboard", anchor=False)
-    st.markdown(
-        """
-        <div style="background: rgba(139, 92, 246, 0.1); border-left: 4px solid #8b5cf6; padding: 12px 16px; border-radius: 0 12px 12px 0; margin-bottom: 20px;">
-            <p style="margin: 0; font-size: 0.88rem; color: #c4b5fd; font-weight: 500;">
-                👔 <b>Executive Overview:</b> Reviewing consolidated vehicle counts and ministry service turnouts across all COG campuses for strategic planning.
-            </p>
-        </div>
-    """,
-        unsafe_allow_html=True,
-    )
+    st.header("📈 COG Dasmarinas Weekly Parking Report", anchor=False)
 
     if not is_leadership_view:
         with st.expander("🔗 Share Clean Executive Link"):
