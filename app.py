@@ -94,6 +94,7 @@ LOCATION_CONFIG = {
             "Empowered Night",
             "Special Event",
         ],
+        "capacity": 350,
     },
     "COG Jabez": {
         "areas": ["Open Parking"],
@@ -104,6 +105,7 @@ LOCATION_CONFIG = {
             "4th Service",
             "5th Service",
         ],
+        "capacity": 100,
     },
     "COG Trece": {
         "areas": ["Main Parking", "BIR"],
@@ -116,6 +118,7 @@ LOCATION_CONFIG = {
             "6th Service",
             "7th Service",
         ],
+        "capacity": 120,
     },
     "COG Silang": {
         "areas": ["Main Parking"],
@@ -127,10 +130,12 @@ LOCATION_CONFIG = {
             "5th Service",
             "6th Service",
         ],
+        "capacity": 80,
     },
     "Palmas Resort": {
         "areas": ["Main Parking"],
         "services": ["Whole Day"],
+        "capacity": 60,
     },
 }
 
@@ -244,6 +249,35 @@ def render_status_header(is_online=True):
     """
 
 
+def render_occupancy_gauge(current_total, max_capacity):
+    pct = min(100, int((current_total / max_capacity) * 100)) if max_capacity > 0 else 0
+    if pct >= 90:
+        bar_color = "#ef4444"
+        status_text = "🔴 CRITICAL CAPACITY"
+    elif pct >= 75:
+        bar_color = "#f59e0b"
+        status_text = "🟡 HEAVY TRAFFIC"
+    else:
+        bar_color = "#10b981"
+        status_text = "🟢 NORMAL FLOW"
+
+    return f"""
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.82rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Zone Peak Occupancy</span>
+            <span style="font-size: 0.8rem; font-weight: 700; color: {bar_color};">{status_text} ({pct}%)</span>
+        </div>
+        <div style="width: 100%; background-color: rgba(255,255,255,0.1); border-radius: 10px; height: 10px; overflow: hidden;">
+            <div style="width: {pct}%; background-color: {bar_color}; height: 100%; border-radius: 10px; transition: width 0.5s ease;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 6px;">
+            <span>Current Total: {current_total:,} vehicles</span>
+            <span>Capacity Target: {max_capacity:,}</span>
+        </div>
+    </div>
+    """
+
+
 def empty_state_card(message="No parking logs recorded for this selection."):
     st.markdown(
         f"""
@@ -269,16 +303,13 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-        /* Import Google Font Inter */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
-        /* Global Theme Reset */
         .stApp {
             background: radial-gradient(circle at 50% -10%, #1e293b 0%, #0f172a 85%) !important;
             font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
         }
 
-        /* Glassmorphic Container Cards */
         div[data-testid="stVerticalBlock"] > div[style*="border"] {
             background: rgba(30, 41, 59, 0.45) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -288,7 +319,6 @@ st.markdown(
             padding: 24px !important;
         }
 
-        /* KPI Card Component Styles */
         .kpi-card-pro {
             background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.9) 100%);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -333,7 +363,6 @@ st.markdown(
             letter-spacing: -1.2px;
         }
 
-        /* Pulsing Status Pill */
         .status-pill {
             display: inline-flex;
             align-items: center;
@@ -357,14 +386,12 @@ st.markdown(
             100% { transform: scale(0.95); opacity: 0.8; }
         }
 
-        /* Input Controls Refinement */
         div[data-baseweb="input"], div[data-baseweb="select"] {
             border-radius: 12px !important;
             border: 1px solid rgba(255, 255, 255, 0.12) !important;
             background-color: rgba(15, 23, 42, 0.6) !important;
         }
 
-        /* Button Hover Animations */
         .stButton>button {
             border-radius: 12px !important;
             font-weight: 700 !important;
@@ -376,7 +403,6 @@ st.markdown(
             box-shadow: 0 10px 24px rgba(37, 99, 235, 0.4) !important;
         }
 
-        /* Clean Sidebar Styling */
         section[data-testid="stSidebar"] {
             background-color: rgba(15, 23, 42, 0.9) !important;
             backdrop-filter: blur(20px) !important;
@@ -520,7 +546,6 @@ if menu == "Log Parking Counts":
             label_visibility="collapsed",
         )
 
-        # Show dynamic text input strictly when 'Special Event' is chosen
         if selected_service_choice == "Special Event":
             custom_event_name = st.text_input(
                 "📝 Enter Specific Event Title (for this Date/Week):",
@@ -738,6 +763,16 @@ elif menu == "View Weekly Report":
                     unsafe_allow_html=True,
                 )
 
+            # Capacity Gauge for Location Filter
+            max_cap = (
+                LOCATION_CONFIG[report_location]["capacity"]
+                if report_location != "All Locations"
+                else sum(cfg["capacity"] for cfg in LOCATION_CONFIG.values())
+            )
+            st.markdown(
+                render_occupancy_gauge(grand_total, max_cap), unsafe_allow_html=True
+            )
+
             st.markdown("### 📈 Interactive Lot Breakdown")
 
             fig = px.bar(
@@ -906,6 +941,35 @@ elif menu == "Summary Dashboard":
                         ),
                         unsafe_allow_html=True,
                     )
+
+                st.divider()
+
+                # --- SERVICE-OVER-SERVICE PEAK ATTENDANCE CHART ---
+                st.markdown("### ⛪ Peak Service Turnout Comparison")
+                svc_comp = (
+                    filtered_dash_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
+                    .sum()
+                    .reset_index()
+                )
+                svc_comp["Total"] = svc_comp["Car_Count"] + svc_comp["Motorcycle_Count"]
+
+                fig_svc = px.bar(
+                    svc_comp,
+                    x="Service",
+                    y=["Car_Count", "Motorcycle_Count"],
+                    title=f"Vehicle Breakdown per Worship Service (Week {selected_week})",
+                    labels={"value": "Vehicles Logged", "variable": "Vehicle Type"},
+                    color_discrete_sequence=["#3b82f6", "#10b981"],
+                    barmode="stack",
+                )
+                fig_svc.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font_color="#f8fafc",
+                    margin=dict(l=10, r=10, t=40, b=10),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                )
+                st.plotly_chart(fig_svc, use_container_width=True)
 
                 st.divider()
 
