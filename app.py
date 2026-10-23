@@ -781,6 +781,7 @@ elif menu == "View Weekly Report":
                 barmode="group",
                 color_discrete_sequence=["#3b82f6", "#10b981"],
                 labels={"value": "Vehicle Count", "variable": "Vehicle Type"},
+                text_auto=".2s",
             )
             fig.update_layout(
                 paper_bgcolor="rgba(0,0,0,0)",
@@ -1012,7 +1013,7 @@ elif menu == "Summary Dashboard":
                                     " Total Vehicles**"
                                 )
 
-                # SUB-TAB 2: VISUAL ANALYTICS & GRAPHS
+                # SUB-TAB 2: VISUAL ANALYTICS & GRAPHS (WITH DATA LABELS)
                 with tab_charts:
                     st.markdown("### ⛪ Peak Service Turnout Comparison")
                     svc_comp = (
@@ -1040,6 +1041,7 @@ elif menu == "Summary Dashboard":
                         },
                         color_discrete_sequence=["#3b82f6", "#10b981"],
                         barmode="stack",
+                        text_auto=True,  # Shows actual numbers on bars
                     )
                     fig_svc.update_layout(
                         paper_bgcolor="rgba(0,0,0,0)",
@@ -1056,7 +1058,7 @@ elif menu == "Summary Dashboard":
                     )
                     st.plotly_chart(fig_svc, use_container_width=True)
 
-                # SUB-TAB 3: 2026 WEEKLY ATTENDANCE TREND LINE
+                # SUB-TAB 3: 2026 WEEKLY ATTENDANCE TREND LINE (WITH DATA LABELS)
                 with tab_trend:
                     st.markdown("### 📈 2026 Year-to-Date Weekly Trend")
                     df["Total_Vehicles"] = (
@@ -1079,34 +1081,45 @@ elif menu == "Summary Dashboard":
 
                     if not trend_grouped.empty:
                         fig_trend = go.Figure()
+
+                        # Total Vehicles line with markers and text numbers
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
                                 y=trend_grouped["Total_Vehicles"],
-                                mode="lines+markers",
+                                mode="lines+markers+text",
                                 name="Total Vehicles",
+                                text=trend_grouped["Total_Vehicles"],
+                                textposition="top center",
+                                textfont=dict(color="#ffffff", size=11),
                                 line=dict(color="#8b5cf6", width=3),
                                 marker=dict(size=8),
                             )
                         )
+
+                        # Cars line
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
                                 y=trend_grouped["Car_Count"],
-                                mode="lines",
+                                mode="lines+markers",
                                 name="Cars",
                                 line=dict(color="#3b82f6", width=2, dash="dash"),
+                                marker=dict(size=6),
                             )
                         )
+
+                        # Motorcycles line
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
                                 y=trend_grouped["Motorcycle_Count"],
-                                mode="lines",
+                                mode="lines+markers",
                                 name="Motorcycles",
                                 line=dict(
                                     color="#10b981", width=2, dash="dash"
                                 ),
+                                marker=dict(size=6),
                             )
                         )
 
