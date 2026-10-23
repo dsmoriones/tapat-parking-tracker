@@ -1010,9 +1010,11 @@ elif menu == "Summary Dashboard":
                                     " Total Vehicles**"
                                 )
 
-                # SUB-TAB 2: DEDICATED GRAPHS PAGE
+                # SUB-TAB 2: DEDICATED GRAPHS PAGE (FILTERED BY LOCATION)
                 with tab_charts:
-                    st.markdown("### ⛪ Peak Worship Service Comparison")
+                    st.markdown(
+                        f"### ⛪ Peak Worship Service Comparison — `{selected_dash_loc}`"
+                    )
                     svc_comp = (
                         filtered_dash_df.groupby("Service")[
                             ["Car_Count", "Motorcycle_Count"]
@@ -1021,37 +1023,44 @@ elif menu == "Summary Dashboard":
                         .reset_index()
                     )
 
-                    fig_svc = px.bar(
-                        svc_comp,
-                        x="Service",
-                        y=["Car_Count", "Motorcycle_Count"],
-                        title=(
-                            f"Vehicle Breakdown per Service (Week"
-                            f" {selected_week})"
-                        ),
-                        labels={
-                            "value": "Vehicles Logged",
-                            "variable": "Vehicle Type",
-                        },
-                        color_discrete_sequence=["#3b82f6", "#10b981"],
-                        barmode="stack",
-                    )
-                    fig_svc.update_layout(
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        font_color="#f8fafc",
-                        margin=dict(l=10, r=10, t=40, b=10),
-                        legend=dict(
-                            orientation="h",
-                            yanchor="bottom",
-                            y=1.02,
-                            xanchor="right",
-                            x=1,
-                        ),
-                    )
-                    st.plotly_chart(fig_svc, use_container_width=True)
+                    if not svc_comp.empty:
+                        fig_svc = px.bar(
+                            svc_comp,
+                            x="Service",
+                            y=["Car_Count", "Motorcycle_Count"],
+                            title=(
+                                f"Vehicle Breakdown per Service (Week"
+                                f" {selected_week}) — {selected_dash_loc}"
+                            ),
+                            labels={
+                                "value": "Vehicles Logged",
+                                "variable": "Vehicle Type",
+                            },
+                            color_discrete_sequence=["#3b82f6", "#10b981"],
+                            barmode="stack",
+                        )
+                        fig_svc.update_layout(
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            font_color="#f8fafc",
+                            margin=dict(l=10, r=10, t=40, b=10),
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=1.02,
+                                xanchor="right",
+                                x=1,
+                            ),
+                        )
+                        st.plotly_chart(fig_svc, use_container_width=True)
+                    else:
+                        st.info(
+                            "No service data available for this location filter."
+                        )
 
-                    st.markdown("### 🅿️ Parking Lot Occupancy Breakdown")
+                    st.markdown(
+                        f"### 🅿️ Parking Lot Occupancy Breakdown — `{selected_dash_loc}`"
+                    )
                     area_comp = (
                         filtered_dash_df.groupby("Parking_Area")[
                             ["Car_Count", "Motorcycle_Count"]
@@ -1060,22 +1069,31 @@ elif menu == "Summary Dashboard":
                         .reset_index()
                     )
 
-                    fig_area = px.bar(
-                        area_comp,
-                        x="Parking_Area",
-                        y=["Car_Count", "Motorcycle_Count"],
-                        title="Vehicle Distribution Across Parking Zones",
-                        labels={"value": "Vehicles", "variable": "Type"},
-                        color_discrete_sequence=["#3b82f6", "#10b981"],
-                        barmode="group",
-                    )
-                    fig_area.update_layout(
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        font_color="#f8fafc",
-                        margin=dict(l=10, r=10, t=40, b=10),
-                    )
-                    st.plotly_chart(fig_area, use_container_width=True)
+                    if not area_comp.empty:
+                        fig_area = px.bar(
+                            area_comp,
+                            x="Parking_Area",
+                            y=["Car_Count", "Motorcycle_Count"],
+                            title=(
+                                f"Vehicle Distribution Across Parking Zones —"
+                                f" {selected_dash_loc}"
+                            ),
+                            labels={"value": "Vehicles", "variable": "Type"},
+                            color_discrete_sequence=["#3b82f6", "#10b981"],
+                            barmode="group",
+                        )
+                        fig_area.update_layout(
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            font_color="#f8fafc",
+                            margin=dict(l=10, r=10, t=40, b=10),
+                        )
+                        st.plotly_chart(fig_area, use_container_width=True)
+                    else:
+                        st.info(
+                            "No parking area data available for this location"
+                            " filter."
+                        )
 
 # ==========================================
 # TAB 4: DATA VERIFICATION (ADMIN ONLY)
