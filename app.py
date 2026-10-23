@@ -63,6 +63,10 @@ def init_turso_db():
 if HAS_TURSO:
   init_turso_db()
 
+# Initialize session state for admin-customized special event name
+if "special_event_name" not in st.session_state:
+  st.session_state.special_event_name = "Special Event"
+
 # Location configuration
 LOCATION_CONFIG = {
     "COG Dasma - Main": {
@@ -91,6 +95,7 @@ LOCATION_CONFIG = {
             "Tuesday Worship Service",
             "Salvation Night",
             "Empowered Night",
+            st.session_state.special_event_name,
         ],
     },
     "COG Jabez": {
@@ -371,6 +376,17 @@ else:
           st.error(f"🔴 Connection failed:\n`{err}`")
 
       st.divider()
+      st.markdown("#### 🎪 COG Main Special Event Name")
+      new_event_title = st.text_input(
+          "Rename Special Event Service:",
+          value=st.session_state.special_event_name,
+      )
+      if st.button("Update Service Name", use_container_width=True):
+        st.session_state.special_event_name = new_event_title.strip()
+        st.success(f"Renamed Special Event to: '{new_event_title}'")
+        st.rerun()
+
+      st.divider()
       custom_banner = st.file_uploader(
           "Upload Header Banner", type=["png", "jpg", "jpeg"]
       )
@@ -402,6 +418,9 @@ st.markdown(status_badge(HAS_TURSO), unsafe_allow_html=True)
 
 # --- TAB 1: LOG PARKING COUNTS ---
 if menu == "Log Parking Counts":
+  # Top anchor for smooth resetting scroll upon submit
+  st.markdown("<div id='top_anchor'></div>", unsafe_allow_html=True)
+
   st.header("📝 Log Parking Counts", anchor=False)
 
   if "success_message" in st.session_state:
@@ -503,6 +522,20 @@ if menu == "Log Parking Counts":
             f"Saved counts for {selected_location} - {selected_service} (Week"
             f" {week_num})!"
         )
+
+        # Smooth-scroll to top anchor on submit
+        st.components.v1.html(
+            """
+            <script>
+                var target = window.parent.document.getElementById('top_anchor');
+                if (target) {
+                    target.scrollIntoView({behavior: 'smooth'});
+                }
+            </script>
+            """,
+            height=0,
+        )
+
         st.rerun()
       except Exception as e:
         st.error(f"Error saving data: {e}")
