@@ -4,6 +4,7 @@ import os
 import pandas as pd
 from PIL import Image
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 # --- TURSO / LIBSQL DRIVER SETUP ---
@@ -943,10 +944,11 @@ elif menu == "Summary Dashboard":
 
                 st.divider()
 
-                # --- SUB-TABS FOR SUMMARY VS GRAPHS ---
-                tab_summary, tab_charts = st.tabs([
+                # --- 3 SUB-TABS: SUMMARY, CHARTS, & 2026 TRENDLINE ---
+                tab_summary, tab_charts, tab_trend = st.tabs([
                     "📋 Executive Summary List",
                     "📊 Visual Analytics & Graphs",
+                    "📈 2026 Weekly Trend Line",
                 ])
 
                 # SUB-TAB 1: EXECUTIVE SUMMARY TEXT LIST
@@ -1010,7 +1012,7 @@ elif menu == "Summary Dashboard":
                                     " Total Vehicles**"
                                 )
 
-                # SUB-TAB 2: SEPARATE DEDICATED GRAPHS PAGE
+                # SUB-TAB 2: VISUAL ANALYTICS & GRAPHS
                 with tab_charts:
                     st.markdown("### ⛪ Peak Service Turnout Comparison")
                     svc_comp = (
@@ -1053,6 +1055,83 @@ elif menu == "Summary Dashboard":
                         ),
                     )
                     st.plotly_chart(fig_svc, use_container_width=True)
+
+                # SUB-TAB 3: 2026 WEEKLY ATTENDANCE TREND LINE
+                with tab_trend:
+                    st.markdown("### 📈 2026 Year-to-Date Weekly Trend")
+                    df["Total_Vehicles"] = (
+                        df["Car_Count"] + df["Motorcycle_Count"]
+                    )
+                    trend_df = (
+                        df
+                        if selected_dash_loc == "All Locations"
+                        else df[df["Location"] == selected_dash_loc]
+                    )
+
+                    trend_grouped = (
+                        trend_df.groupby("Week_Number")[
+                            ["Car_Count", "Motorcycle_Count", "Total_Vehicles"]
+                        ]
+                        .sum()
+                        .reset_index()
+                        .sort_values("Week_Number")
+                    )
+
+                    if not trend_grouped.empty:
+                        fig_trend = go.Figure()
+                        fig_trend.add_trace(
+                            go.Scatter(
+                                x=trend_grouped["Week_Number"],
+                                y=trend_grouped["Total_Vehicles"],
+                                mode="lines+markers",
+                                name="Total Vehicles",
+                                line=dict(color="#8b5cf6", width=3),
+                                marker=dict(size=8),
+                            )
+                        )
+                        fig_trend.add_trace(
+                            go.Scatter(
+                                x=trend_grouped["Week_Number"],
+                                y=trend_grouped["Car_Count"],
+                                mode="lines",
+                                name="Cars",
+                                line=dict(color="#3b82f6", width=2, dash="dash"),
+                            )
+                        )
+                        fig_trend.add_trace(
+                            go.Scatter(
+                                x=trend_grouped["Week_Number"],
+                                y=trend_grouped["Motorcycle_Count"],
+                                mode="lines",
+                                name="Motorcycles",
+                                line=dict(
+                                    color="#10b981", width=2, dash="dash"
+                                ),
+                            )
+                        )
+
+                        fig_trend.update_layout(
+                            title=(
+                                f"2026 Attendance Progression Across Weeks —"
+                                f" {selected_dash_loc}"
+                            ),
+                            xaxis_title="Week Number",
+                            yaxis_title="Total Vehicles Counted",
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            font_color="#f8fafc",
+                            margin=dict(l=10, r=10, t=40, b=10),
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=1.02,
+                                xanchor="right",
+                                x=1,
+                            ),
+                        )
+                        st.plotly_chart(fig_trend, use_container_width=True)
+                    else:
+                        st.info("No historical logs available for 2026 yet.")
 
 # ==========================================
 # TAB 4: DATA VERIFICATION (ADMIN ONLY)
