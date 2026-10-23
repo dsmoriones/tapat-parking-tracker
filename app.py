@@ -212,53 +212,87 @@ def save_data(new_entries_df):
     st.error(f"Error saving to local CSV: {e}")
 
 
-# --- UI HELPER COMPONENTS ---
+# --- ENHANCED UI COMPONENTS ---
 def kpi_card_pro(title, value, icon, color_gradient):
   return f"""
     <div style="
-        background: rgba(30, 41, 59, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 16px;
-        padding: 20px;
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 18px;
+        padding: 22px;
         position: relative;
         overflow: hidden;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-        margin-bottom: 12px;
+        backdrop-filter: blur(16px);
+        box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5);
+        margin-bottom: 14px;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
     ">
         <div style="
             position: absolute;
             top: 0; left: 0; right: 0;
             height: 4px;
             background: {color_gradient};
+            box-shadow: 0 2px 10px {color_gradient.split()[1]};
         "></div>
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.82rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">{title}</span>
-            <span style="font-size: 1.4rem;">{icon}</span>
+            <span style="font-size: 0.8rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">{title}</span>
+            <span style="font-size: 1.6rem; background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">{icon}</span>
         </div>
-        <h2 style="font-size: 2rem; font-weight: 800; color: #f8fafc; margin: 8px 0 0 0; letter-spacing: -0.5px;">{value:,}</h2>
+        <h2 style="font-size: 2.2rem; font-weight: 900; color: #ffffff; margin: 10px 0 0 0; letter-spacing: -1px;">{value:,}</h2>
     </div>
     """
 
 
-def status_badge_pill(is_online=True, location_text="COG Dasma - Main"):
+def status_badge_pill(is_online=True, location_text="System Active"):
   color = "#10b981" if is_online else "#f59e0b"
+  glow = "0 0 12px rgba(16, 185, 129, 0.4)" if is_online else "none"
   label = "TURSO CLOUD ONLINE" if is_online else "LOCAL CSV BACKUP MODE"
   return f"""
-    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
-        <span style="background: rgba(16, 185, 129, 0.15); border: 1px solid {color}; color: #34d399; padding: 5px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;">● {label}</span>
-        <span style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; padding: 5px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;">📍 {location_text}</span>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
+        <span style="
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid {color};
+            color: #34d399;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            box-shadow: {glow};
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        "><span style="height: 6px; width: 6px; background-color: {color}; border-radius: 50%;"></span> {label}</span>
+        <span style="
+            background: rgba(59, 130, 246, 0.12);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            color: #60a5fa;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 0.78rem;
+            font-weight: 800;
+        ">📍 {location_text}</span>
     </div>
+    """
+
+
+def section_divider():
+  return """
+    <div style="
+        height: 2px;
+        background: linear-gradient(90deg, rgba(59, 130, 246, 0.8) 0%, rgba(139, 92, 246, 0.8) 50%, rgba(0,0,0,0) 100%);
+        margin: 20px 0 26px 0;
+        border-radius: 2px;
+    "></div>
     """
 
 
 def empty_state_card(message="No parking logs recorded for this selection."):
   st.markdown(
       f"""
-    <div style="text-align: center; padding: 36px 20px; background-color: rgba(30, 41, 59, 0.6); border-radius: 14px; border: 2px dashed #334155; margin: 15px 0;">
-        <p style="font-size: 2.5rem; margin-bottom: 8px;">📋</p>
-        <h4 style="margin: 0; opacity: 0.95; color: #f8fafc; font-weight: 700;">{message}</h4>
-        <p style="font-size: 0.85rem; opacity: 0.6; margin-top: 6px; color: #94a3b8;">Select another week/location or switch to "Log Parking Counts" to insert data.</p>
+    <div style="text-align: center; padding: 42px 24px; background: rgba(30, 41, 59, 0.4); border-radius: 18px; border: 2px dashed rgba(51, 65, 85, 0.8); margin: 20px 0; backdrop-filter: blur(10px);">
+        <p style="font-size: 2.8rem; margin-bottom: 10px;">📋</p>
+        <h4 style="margin: 0; opacity: 0.95; color: #f8fafc; font-weight: 800;">{message}</h4>
+        <p style="font-size: 0.88rem; color: #94a3b8; margin-top: 8px;">Select another week/location or switch to "Log Parking Counts" to insert data.</p>
     </div>
     """,
       unsafe_allow_html=True,
@@ -275,44 +309,42 @@ st.markdown(
     <style>
         /* Smooth Global Dark Theme */
         .stApp {
-            background: radial-gradient(circle at 50% -20%, #1e293b 0%, #0f172a 80%) !important;
+            background: radial-gradient(circle at 50% -10%, #1e293b 0%, #0f172a 85%) !important;
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
         }
 
-        /* Glassmorphism Card Containers */
+        /* Modern Glassmorphism Container Borders */
         div[data-testid="stVerticalBlock"] > div[style*="border"] {
             background: rgba(30, 41, 59, 0.45) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
-            border-radius: 16px !important;
-            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
-            backdrop-filter: blur(12px) !important;
+            border-radius: 18px !important;
+            box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.5) !important;
+            backdrop-filter: blur(14px) !important;
         }
 
-        /* Metric Cards Customization */
-        [data-testid="stMetric"] {
-            background-color: rgba(30, 41, 59, 0.75);
-            padding: 16px;
-            border-radius: 14px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            border: 1px solid rgba(51, 65, 85, 0.8);
-            backdrop-filter: blur(8px);
+        /* Form & Input Elements Styling */
+        div[data-baseweb="input"], div[data-baseweb="select"] {
+            border-radius: 12px !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            background-color: rgba(15, 23, 42, 0.6) !important;
         }
-        
-        /* Button Hover Animations */
+
+        /* Buttons Upgrade */
         .stButton>button {
-            border-radius: 10px;
-            font-weight: 600;
-            transition: all 0.2s ease-in-out !important;
+            border-radius: 12px !important;
+            font-weight: 700 !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
         .stButton>button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 15px rgba(37, 99, 235, 0.3);
+            transform: translateY(-2px) !important;
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35) !important;
         }
 
-        /* Input Fields Styling */
-        div[data-baseweb="input"], div[data-baseweb="select"] {
-            border-radius: 10px !important;
-            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        /* Sidebar Glassmorphism */
+        section[data-testid="stSidebar"] {
+            background-color: rgba(15, 23, 42, 0.85) !important;
+            backdrop-filter: blur(16px) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
         }
     </style>
 """,
@@ -422,10 +454,10 @@ st.markdown(
 
 # --- TAB 1: LOG PARKING COUNTS ---
 if menu == "Log Parking Counts":
-  # Anchor div to scroll back to top upon form submission
   st.markdown("<div id='top_anchor'></div>", unsafe_allow_html=True)
 
   st.header("📝 Log Parking Counts", anchor=False)
+  st.markdown(section_divider(), unsafe_allow_html=True)
 
   if "success_message" in st.session_state:
     st.success(st.session_state["success_message"], icon="✅")
@@ -448,7 +480,6 @@ if menu == "Log Parking Counts":
         label_visibility="collapsed",
     )
 
-    # Show text box ONLY when 'Special Event' is chosen
     if selected_service_choice == "Special Event":
       custom_event_name = st.text_input(
           "📝 Enter Specific Event Title (for this Date/Week):",
@@ -487,9 +518,9 @@ if menu == "Log Parking Counts":
           )
         counts_data[area] = {"cars": cars, "motors": motors}
 
-    st.markdown("### 📷 Traffic Incident Photo Verification (Optional)")
+    st.markdown("### 📷 Photo Verification (Optional)")
     uploaded_file = st.file_uploader(
-        "Upload photos of traffic incidents",
+        "Upload photos of full parking lots or traffic incidents",
         type=["png", "jpg", "jpeg"],
     )
 
@@ -541,7 +572,6 @@ if menu == "Log Parking Counts":
             f" {week_num})!"
         )
 
-        # Smooth-scroll trigger to jump to top anchor
         st.components.v1.html(
             """
             <script>
@@ -561,6 +591,7 @@ if menu == "Log Parking Counts":
 # --- TAB 2: VIEW WEEKLY REPORT ---
 elif menu == "View Weekly Report":
   st.header("📊 Weekly Summary Report", anchor=False)
+  st.markdown(section_divider(), unsafe_allow_html=True)
 
   df = load_data()
 
@@ -687,7 +718,6 @@ elif menu == "View Weekly Report":
 
       st.divider()
 
-      # Export format dataset
       export_df = summary_table.copy()
       export_df.insert(0, "Week Number", int(selected_week))
       export_df = export_df[[
@@ -741,6 +771,7 @@ elif menu == "View Weekly Report":
 # --- TAB 3: SUMMARY DASHBOARD ---
 elif menu == "Summary Dashboard":
   st.header("📈 COG Dasmarinas Weekly Parking Report", anchor=False)
+  st.markdown(section_divider(), unsafe_allow_html=True)
 
   if not is_leadership_view:
     with st.expander("🔗 Share Clean Executive Link"):
@@ -853,7 +884,6 @@ elif menu == "Summary Dashboard":
                   .reset_index()
               )
 
-              # Include dynamic event names in category sorting order
               config_services = LOCATION_CONFIG[loc]["services"] + list(
                   set(service_grouped["Service"])
                   - set(LOCATION_CONFIG[loc]["services"])
@@ -892,6 +922,7 @@ elif menu == "Data Verification" and getattr(
     st.session_state, "is_admin", False
 ):
   st.header("🔒 Admin Data Verification Log", anchor=False)
+  st.markdown(section_divider(), unsafe_allow_html=True)
 
   df_verify = load_data()
 
