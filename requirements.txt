@@ -3,3 +3,4 @@ pandas
 pillow
 libsql
 openpyxl
+plotly
