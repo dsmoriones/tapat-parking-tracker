@@ -487,9 +487,9 @@ if menu == "Log Parking Counts":
           )
         counts_data[area] = {"cars": cars, "motors": motors}
 
-    st.markdown("### 📷 Photo Verification (Optional)")
+    st.markdown("### 📷 Traffic Incident Photo Verification (Optional)")
     uploaded_file = st.file_uploader(
-        "Upload photos of full parking lots or traffic incidents",
+        "Upload photos of traffic incidents",
         type=["png", "jpg", "jpeg"],
     )
 
