@@ -564,7 +564,6 @@ if menu == "Log Parking Counts":
     with st.form("table_entry_form", clear_on_submit=True):
         counts_data = {}
 
-        # Render area cards in a clean 2-column responsive layout grid
         for i in range(0, len(active_parking_areas), 2):
             cols = st.columns(2)
             for j in range(2):
@@ -763,7 +762,6 @@ elif menu == "View Weekly Report":
                     unsafe_allow_html=True,
                 )
 
-            # Capacity Gauge for Location Filter
             max_cap = (
                 LOCATION_CONFIG[report_location]["capacity"]
                 if report_location != "All Locations"
@@ -895,10 +893,11 @@ elif menu == "Summary Dashboard":
         if week_df.empty:
             empty_state_card(f"No records found for Week {selected_week}.")
         else:
-            if selected_dash_loc != "All Locations":
-                filtered_dash_df = week_df[week_df["Location"] == selected_dash_loc]
-            else:
-                filtered_dash_df = week_df
+            filtered_dash_df = (
+                week_df
+                if selected_dash_loc == "All Locations"
+                else week_df[week_df["Location"] == selected_dash_loc]
+            )
 
             if filtered_dash_df.empty:
                 empty_state_card(
@@ -944,86 +943,139 @@ elif menu == "Summary Dashboard":
 
                 st.divider()
 
-                # --- SERVICE-OVER-SERVICE PEAK ATTENDANCE CHART ---
-                st.markdown("### ⛪ Peak Service Turnout Comparison")
-                svc_comp = (
-                    filtered_dash_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
-                    .sum()
-                    .reset_index()
-                )
-                svc_comp["Total"] = svc_comp["Car_Count"] + svc_comp["Motorcycle_Count"]
+                # --- SUB-TABS FOR TEXT VS GRAPHS ---
+                tab_summary, tab_charts = st.tabs([
+                    "📋 Executive Summary List",
+                    "📊 Visual Analytics & Graphs",
+                ])
 
-                fig_svc = px.bar(
-                    svc_comp,
-                    x="Service",
-                    y=["Car_Count", "Motorcycle_Count"],
-                    title=f"Vehicle Breakdown per Worship Service (Week {selected_week})",
-                    labels={"value": "Vehicles Logged", "variable": "Vehicle Type"},
-                    color_discrete_sequence=["#3b82f6", "#10b981"],
-                    barmode="stack",
-                )
-                fig_svc.update_layout(
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    font_color="#f8fafc",
-                    margin=dict(l=10, r=10, t=40, b=10),
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                )
-                st.plotly_chart(fig_svc, use_container_width=True)
+                # SUB-TAB 1: TEXT BREAKDOWN
+                with tab_summary:
+                    target_locations = (
+                        list(LOCATION_CONFIG.keys())
+                        if selected_dash_loc == "All Locations"
+                        else [selected_dash_loc]
+                    )
 
-                st.divider()
+                    for loc in target_locations:
+                        loc_df = week_df[week_df["Location"] == loc]
 
-                target_locations = (
-                    list(LOCATION_CONFIG.keys())
-                    if selected_dash_loc == "All Locations"
-                    else [selected_dash_loc]
-                )
+                        if not loc_df.empty:
+                            with st.container(border=True):
+                                st.markdown(f"### 📍 {loc}")
 
-                for loc in target_locations:
-                    loc_df = week_df[week_df["Location"] == loc]
-
-                    if not loc_df.empty:
-                        with st.container(border=True):
-                            st.markdown(f"### 📍 {loc}")
-
-                            service_grouped = (
-                                loc_df.groupby("Service")[["Car_Count", "Motorcycle_Count"]]
-                                .sum()
-                                .reset_index()
-                            )
-
-                            config_services = LOCATION_CONFIG[loc]["services"] + list(
-                                set(service_grouped["Service"])
-                                - set(LOCATION_CONFIG[loc]["services"])
-                            )
-                            service_grouped["Service"] = pd.Categorical(
-                                service_grouped["Service"],
-                                categories=config_services,
-                                ordered=True,
-                            )
-                            service_grouped = service_grouped.sort_values("Service")
-
-                            loc_cars = 0
-                            loc_motors = 0
-
-                            for _, row in service_grouped.iterrows():
-                                svc = row["Service"]
-                                c = int(row["Car_Count"])
-                                m = int(row["Motorcycle_Count"])
-                                tot = c + m
-                                loc_cars += c
-                                loc_motors += m
-
-                                st.write(
-                                    f"• **{svc}:** {c:,} Cars | {m:,} Motorcycles *(Total:"
-                                    f" {tot:,})*"
+                                service_grouped = (
+                                    loc_df.groupby("Service")[
+                                        ["Car_Count", "Motorcycle_Count"]
+                                    ]
+                                    .sum()
+                                    .reset_index()
                                 )
 
-                            loc_combined = loc_cars + loc_motors
-                            st.success(
-                                f"**{loc} Subtotal:** {loc_cars:,} Cars + {loc_motors:,}"
-                                f" Motorcycles = **{loc_combined:,} Total Vehicles**"
-                            )
+                                config_services = LOCATION_CONFIG[loc][
+                                    "services"
+                                ] + list(
+                                    set(service_grouped["Service"])
+                                    - set(LOCATION_CONFIG[loc]["services"])
+                                )
+                                service_grouped["Service"] = pd.Categorical(
+                                    service_grouped["Service"],
+                                    categories=config_services,
+                                    ordered=True,
+                                )
+                                service_grouped = service_grouped.sort_values(
+                                    "Service"
+                                )
+
+                                loc_cars = 0
+                                loc_motors = 0
+
+                                for _, row in service_grouped.iterrows():
+                                    svc = row["Service"]
+                                    c = int(row["Car_Count"])
+                                    m = int(row["Motorcycle_Count"])
+                                    tot = c + m
+                                    loc_cars += c
+                                    loc_motors += m
+
+                                    st.write(
+                                        f"• **{svc}:** {c:,} Cars | {m:,}"
+                                        f" Motorcycles *(Total: {tot:,})*"
+                                    )
+
+                                loc_combined = loc_cars + loc_motors
+                                st.success(
+                                    f"**{loc} Subtotal:** {loc_cars:,} Cars +"
+                                    f" {loc_motors:,} Motorcycles = **{loc_combined:,}"
+                                    " Total Vehicles**"
+                                )
+
+                # SUB-TAB 2: DEDICATED GRAPHS PAGE
+                with tab_charts:
+                    st.markdown("### ⛪ Peak Worship Service Comparison")
+                    svc_comp = (
+                        filtered_dash_df.groupby("Service")[
+                            ["Car_Count", "Motorcycle_Count"]
+                        ]
+                        .sum()
+                        .reset_index()
+                    )
+
+                    fig_svc = px.bar(
+                        svc_comp,
+                        x="Service",
+                        y=["Car_Count", "Motorcycle_Count"],
+                        title=(
+                            f"Vehicle Breakdown per Service (Week"
+                            f" {selected_week})"
+                        ),
+                        labels={
+                            "value": "Vehicles Logged",
+                            "variable": "Vehicle Type",
+                        },
+                        color_discrete_sequence=["#3b82f6", "#10b981"],
+                        barmode="stack",
+                    )
+                    fig_svc.update_layout(
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        font_color="#f8fafc",
+                        margin=dict(l=10, r=10, t=40, b=10),
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=1.02,
+                            xanchor="right",
+                            x=1,
+                        ),
+                    )
+                    st.plotly_chart(fig_svc, use_container_width=True)
+
+                    st.markdown("### 🅿️ Parking Lot Occupancy Breakdown")
+                    area_comp = (
+                        filtered_dash_df.groupby("Parking_Area")[
+                            ["Car_Count", "Motorcycle_Count"]
+                        ]
+                        .sum()
+                        .reset_index()
+                    )
+
+                    fig_area = px.bar(
+                        area_comp,
+                        x="Parking_Area",
+                        y=["Car_Count", "Motorcycle_Count"],
+                        title="Vehicle Distribution Across Parking Zones",
+                        labels={"value": "Vehicles", "variable": "Type"},
+                        color_discrete_sequence=["#3b82f6", "#10b981"],
+                        barmode="group",
+                    )
+                    fig_area.update_layout(
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        font_color="#f8fafc",
+                        margin=dict(l=10, r=10, t=40, b=10),
+                    )
+                    st.plotly_chart(fig_area, use_container_width=True)
 
 # ==========================================
 # TAB 4: DATA VERIFICATION (ADMIN ONLY)
