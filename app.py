@@ -63,9 +63,9 @@ def init_turso_db():
 if HAS_TURSO:
   init_turso_db()
 
-# Initialize session state for admin-customized special event name
-if "special_event_name" not in st.session_state:
-  st.session_state.special_event_name = "Special Event"
+# Initialize session state for default special event label template
+if "special_event_default" not in st.session_state:
+  st.session_state.special_event_default = "Special Event"
 
 # Location configuration
 LOCATION_CONFIG = {
@@ -95,7 +95,7 @@ LOCATION_CONFIG = {
             "Tuesday Worship Service",
             "Salvation Night",
             "Empowered Night",
-            st.session_state.special_event_name,
+            st.session_state.special_event_default,
         ],
     },
     "COG Jabez": {
@@ -376,14 +376,13 @@ else:
           st.error(f"🔴 Connection failed:\n`{err}`")
 
       st.divider()
-      st.markdown("#### 🎪 COG Main Special Event Name")
+      st.markdown("#### 🎪 Default Special Event Label")
       new_event_title = st.text_input(
-          "Rename Special Event Service:",
-          value=st.session_state.special_event_name,
+          "Set Default Label:", value=st.session_state.special_event_default
       )
-      if st.button("Update Service Name", use_container_width=True):
-        st.session_state.special_event_name = new_event_title.strip()
-        st.success(f"Renamed Special Event to: '{new_event_title}'")
+      if st.button("Update Default Label", use_container_width=True):
+        st.session_state.special_event_default = new_event_title.strip()
+        st.success(f"Default Special Event set to: '{new_event_title}'")
         st.rerun()
 
       st.divider()
@@ -418,7 +417,7 @@ st.markdown(status_badge(HAS_TURSO), unsafe_allow_html=True)
 
 # --- TAB 1: LOG PARKING COUNTS ---
 if menu == "Log Parking Counts":
-  # Top anchor for smooth resetting scroll upon submit
+  # Anchor div to scroll back to top upon form submission
   st.markdown("<div id='top_anchor'></div>", unsafe_allow_html=True)
 
   st.header("📝 Log Parking Counts", anchor=False)
@@ -436,13 +435,30 @@ if menu == "Log Parking Counts":
     active_parking_areas = LOCATION_CONFIG[selected_location]["areas"]
 
     st.markdown("##### ⛪ Worship Service:")
-    selected_service = st.segmented_control(
+    selected_service_choice = st.segmented_control(
         "Select Service",
         options=active_services,
         selection_mode="single",
         default=active_services[0],
         label_visibility="collapsed",
     )
+
+    # Allow custom dynamic naming if a Special Event choice is chosen
+    if (
+        selected_service_choice == st.session_state.special_event_default
+        or "Special Event" in str(selected_service_choice)
+    ):
+      custom_event_name = st.text_input(
+          "📝 Enter Specific Event Title (for this Date/Week):",
+          value=f"Special Event - {datetime.now().strftime('%b %d')}",
+      )
+      final_service_name = (
+          custom_event_name.strip()
+          if custom_event_name.strip()
+          else selected_service_choice
+      )
+    else:
+      final_service_name = selected_service_choice
 
     log_date = st.date_input("📅 Log Date", datetime.now())
 
@@ -494,7 +510,7 @@ if menu == "Log Parking Counts":
       saved_image_path = ""
 
       if uploaded_file is not None:
-        img_filename = f"{log_date.strftime('%Y%m%d')}_{selected_service.split()[0]}_{uploaded_file.name}"
+        img_filename = f"{log_date.strftime('%Y%m%d')}_{final_service_name.replace(' ', '_')}_{uploaded_file.name}"
         saved_image_path = os.path.join(IMAGE_DIR, img_filename)
         image = Image.open(uploaded_file)
         image.save(saved_image_path)
@@ -506,7 +522,7 @@ if menu == "Log Parking Counts":
             "Date": log_date.strftime("%Y-%m-%d"),
             "Week_Number": int(week_num),
             "Location": selected_location,
-            "Service": selected_service,
+            "Service": final_service_name,
             "Parking_Area": area,
             "Car_Count": int(vals["cars"]),
             "Motorcycle_Count": int(vals["motors"]),
@@ -519,11 +535,11 @@ if menu == "Log Parking Counts":
         save_data(new_df)
         st.cache_data.clear()
         st.session_state["success_message"] = (
-            f"Saved counts for {selected_location} - {selected_service} (Week"
+            f"Saved counts for {selected_location} - {final_service_name} (Week"
             f" {week_num})!"
         )
 
-        # Smooth-scroll to top anchor on submit
+        # Smooth-scroll trigger to jump to top anchor
         st.components.v1.html(
             """
             <script>
@@ -792,7 +808,14 @@ elif menu == "Summary Dashboard":
                   .reset_index()
               )
 
-              config_services = LOCATION_CONFIG[loc]["services"]
+              # Include logged dynamic event names in sorting category order
+              config_services = (
+                  LOCATION_CONFIG[loc]["services"]
+                  + list(
+                      set(service_grouped["Service"])
+                      - set(LOCATION_CONFIG[loc]["services"])
+                  )
+              )
               service_grouped["Service"] = pd.Categorical(
                   service_grouped["Service"],
                   categories=config_services,
