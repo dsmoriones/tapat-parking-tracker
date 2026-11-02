@@ -70,7 +70,6 @@ if HAS_TURSO:
 def get_week_date_range(year, week_num):
     try:
         jan_1 = datetime(year, 1, 1)
-        # Adjust to ISO week start (Monday)
         start_date = jan_1 + timedelta(
             days=(week_num - 1) * 7 - jan_1.weekday()
         )
@@ -711,185 +710,198 @@ elif menu == "View Weekly Report":
         empty_state_card("No parking logs found yet.")
     else:
         today = datetime.now()
-        if today.weekday() == 6:
-            curr_calc_date = today - timedelta(days=1)
+        current_year = today.year
+
+        available_weeks = sorted(df["Week_Number"].dropna().unique().astype(int))
+
+        if not available_weeks:
+            empty_state_card("No valid week numbers found in data.")
         else:
-            curr_calc_date = today
+            r_col1, r_col2 = st.columns(2)
+            with r_col1:
+                selected_week = st.selectbox(
+                    "Select Week Number & Dates:",
+                    options=available_weeks,
+                    format_func=lambda w: get_week_date_range(current_year, w),
+                )
+            with r_col2:
+                report_location = st.selectbox(
+                    "Filter by Location:",
+                    ["All Locations"] + list(LOCATION_CONFIG.keys()),
+                )
 
-        current_week = curr_calc_date.isocalendar()[1]
-        current_year = curr_calc_date.year
-
-        r_col1, r_col2 = st.columns(2)
-        with r_col1:
-            selected_week = st.selectbox(
-                "Select Week Number & Dates:",
-                options=list(range(1, 54)),
-                index=int(current_week) - 1,
-                format_func=lambda w: get_week_date_range(current_year, w),
-            )
-        with r_col2:
-            report_location = st.selectbox(
-                "Filter by Location:",
-                ["All Locations"] + list(LOCATION_CONFIG.keys()),
-            )
-
-        filtered_df = df[df["Week_Number"] == selected_week]
-
-        if report_location != "All Locations":
-            filtered_df = filtered_df[filtered_df["Location"] == report_location]
-
-        if filtered_df.empty:
-            empty_state_card(
-                f"No records found for Week {selected_week} ({report_location})."
-            )
-        else:
-            filtered_df["Total_Vehicles"] = (
-                filtered_df["Car_Count"] + filtered_df["Motorcycle_Count"]
-            )
-
-            summary_table = (
-                filtered_df.groupby(["Location", "Parking_Area"])[
-                    ["Car_Count", "Motorcycle_Count", "Total_Vehicles"]
-                ]
-                .sum()
-                .reset_index()
-            )
+            filtered_df = df[df["Week_Number"] == selected_week]
 
             if report_location != "All Locations":
-                custom_order = LOCATION_CONFIG[report_location]["areas"]
-                summary_table["Parking_Area"] = pd.Categorical(
-                    summary_table["Parking_Area"], categories=custom_order, ordered=True
+                filtered_df = filtered_df[
+                    filtered_df["Location"] == report_location
+                ]
+
+            if filtered_df.empty:
+                empty_state_card(
+                    f"No records found for Week {selected_week} ({report_location})."
                 )
-                summary_table = summary_table.sort_values("Parking_Area")
+            else:
+                filtered_df["Total_Vehicles"] = (
+                    filtered_df["Car_Count"] + filtered_df["Motorcycle_Count"]
+                )
 
-            summary_table.columns = [
-                "Location",
-                "Parking Area",
-                "Cars",
-                "Motorcycles",
-                "Total Vehicles",
-            ]
+                summary_table = (
+                    filtered_df.groupby(["Location", "Parking_Area"])[
+                        ["Car_Count", "Motorcycle_Count", "Total_Vehicles"]
+                    ]
+                    .sum()
+                    .reset_index()
+                )
 
-            st.dataframe(summary_table, use_container_width=True)
+                if report_location != "All Locations":
+                    custom_order = LOCATION_CONFIG[report_location]["areas"]
+                    summary_table["Parking_Area"] = pd.Categorical(
+                        summary_table["Parking_Area"],
+                        categories=custom_order,
+                        ordered=True,
+                    )
+                    summary_table = summary_table.sort_values("Parking_Area")
 
-            total_cars = filtered_df["Car_Count"].sum()
-            total_motors = filtered_df["Motorcycle_Count"].sum()
-            grand_total = filtered_df["Total_Vehicles"].sum()
+                summary_table.columns = [
+                    "Location",
+                    "Parking Area",
+                    "Cars",
+                    "Motorcycles",
+                    "Total Vehicles",
+                ]
 
-            col1, col2, col3 = st.columns(3)
-            with col1:
+                st.dataframe(summary_table, use_container_width=True)
+
+                total_cars = filtered_df["Car_Count"].sum()
+                total_motors = filtered_df["Motorcycle_Count"].sum()
+                grand_total = filtered_df["Total_Vehicles"].sum()
+
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.markdown(
+                        render_kpi_card(
+                            "Total Cars",
+                            total_cars,
+                            "🚘",
+                            "linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)",
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                with col2:
+                    st.markdown(
+                        render_kpi_card(
+                            "Total Motorcycles",
+                            total_motors,
+                            "🛵",
+                            "linear-gradient(90deg, #10b981 0%, #047857 100%)",
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                with col3:
+                    st.markdown(
+                        render_kpi_card(
+                            "Grand Total",
+                            grand_total,
+                            "📊",
+                            "linear-gradient(90deg, #8b5cf6 0%, #6d28d9 100%)",
+                        ),
+                        unsafe_allow_html=True,
+                    )
+
+                max_cap = (
+                    LOCATION_CONFIG[report_location]["capacity"]
+                    if report_location != "All Locations"
+                    else sum(cfg["capacity"] for cfg in LOCATION_CONFIG.values())
+                )
                 st.markdown(
-                    render_kpi_card(
-                        "Total Cars",
-                        total_cars,
-                        "🚘",
-                        "linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)",
-                    ),
+                    render_occupancy_gauge(grand_total, max_cap),
                     unsafe_allow_html=True,
                 )
-            with col2:
-                st.markdown(
-                    render_kpi_card(
-                        "Total Motorcycles",
-                        total_motors,
-                        "🛵",
-                        "linear-gradient(90deg, #10b981 0%, #047857 100%)",
-                    ),
-                    unsafe_allow_html=True,
+
+                st.markdown("### 📈 Interactive Lot Breakdown")
+
+                fig = px.bar(
+                    summary_table,
+                    x="Parking Area",
+                    y=["Cars", "Motorcycles"],
+                    barmode="group",
+                    color_discrete_sequence=["#3b82f6", "#10b981"],
+                    labels={"value": "Vehicle Count", "variable": "Vehicle Type"},
+                    text_auto=".2s",
                 )
-            with col3:
-                st.markdown(
-                    render_kpi_card(
-                        "Grand Total",
-                        grand_total,
-                        "📊",
-                        "linear-gradient(90deg, #8b5cf6 0%, #6d28d9 100%)",
+                fig.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font_color="#f8fafc",
+                    margin=dict(l=10, r=10, t=20, b=10),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1,
                     ),
-                    unsafe_allow_html=True,
                 )
+                st.plotly_chart(fig, use_container_width=True)
 
-            max_cap = (
-                LOCATION_CONFIG[report_location]["capacity"]
-                if report_location != "All Locations"
-                else sum(cfg["capacity"] for cfg in LOCATION_CONFIG.values())
-            )
-            st.markdown(
-                render_occupancy_gauge(grand_total, max_cap), unsafe_allow_html=True
-            )
+                st.divider()
 
-            st.markdown("### 📈 Interactive Lot Breakdown")
+                export_df = summary_table.copy()
+                export_df.insert(0, "Week Number", int(selected_week))
+                export_df = export_df[[
+                    "Week Number",
+                    "Location",
+                    "Parking Area",
+                    "Total Vehicles",
+                ]]
+                export_df.columns = [
+                    "Week Number",
+                    "Church Location",
+                    "Parking Location",
+                    "Vehicle Count",
+                ]
 
-            fig = px.bar(
-                summary_table,
-                x="Parking Area",
-                y=["Cars", "Motorcycles"],
-                barmode="group",
-                color_discrete_sequence=["#3b82f6", "#10b981"],
-                labels={"value": "Vehicle Count", "variable": "Vehicle Type"},
-                text_auto=".2s",
-            )
-            fig.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font_color="#f8fafc",
-                margin=dict(l=10, r=10, t=20, b=10),
-                legend=dict(
-                    orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
-                ),
-            )
-            st.plotly_chart(fig, use_container_width=True)
+                dl_col1, dl_col2 = st.columns(2)
 
-            st.divider()
+                with dl_col1:
+                    csv_data = summary_table.to_csv(index=False).encode(
+                        "utf-8"
+                    )
+                    st.download_button(
+                        label="Export CSV Report",
+                        icon=":material/download:",
+                        data=csv_data,
+                        file_name=(
+                            f"tapat_report_week_{selected_week}_{report_location.replace(' ', '_')}.csv"
+                        ),
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
 
-            export_df = summary_table.copy()
-            export_df.insert(0, "Week Number", int(selected_week))
-            export_df = export_df[[
-                "Week Number",
-                "Location",
-                "Parking Area",
-                "Total Vehicles",
-            ]]
-            export_df.columns = [
-                "Week Number",
-                "Church Location",
-                "Parking Location",
-                "Vehicle Count",
-            ]
+                with dl_col2:
+                    excel_buffer = io.BytesIO()
+                    with pd.ExcelWriter(
+                        excel_buffer, engine="openpyxl"
+                    ) as writer:
+                        export_df.to_excel(
+                            writer, index=False, sheet_name="Weekly Report"
+                        )
+                    excel_data = excel_buffer.getvalue()
 
-            dl_col1, dl_col2 = st.columns(2)
-
-            with dl_col1:
-                csv_data = summary_table.to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    label="Export CSV Report",
-                    icon=":material/download:",
-                    data=csv_data,
-                    file_name=(
-                        f"tapat_report_week_{selected_week}_{report_location.replace(' ', '_')}.csv"
-                    ),
-                    mime="text/csv",
-                    use_container_width=True,
-                )
-
-            with dl_col2:
-                excel_buffer = io.BytesIO()
-                with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-                    export_df.to_excel(writer, index=False, sheet_name="Weekly Report")
-                excel_data = excel_buffer.getvalue()
-
-                st.download_button(
-                    label="Export Excel Report (.xlsx)",
-                    icon=":material/description:",
-                    data=excel_data,
-                    file_name=(
-                        f"tapat_report_week_{selected_week}_{report_location.replace(' ', '_')}.xlsx"
-                    ),
-                    mime=(
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    ),
-                    use_container_width=True,
-                    type="primary",
-                )
+                    st.download_button(
+                        label="Export Excel Report (.xlsx)",
+                        icon=":material/description:",
+                        data=excel_data,
+                        file_name=(
+                            f"tapat_report_week_{selected_week}_{report_location.replace(' ', '_')}.xlsx"
+                        ),
+                        mime=(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        ),
+                        use_container_width=True,
+                        type="primary",
+                    )
 
 # ==========================================
 # TAB 3: SUMMARY DASHBOARD
@@ -909,348 +921,265 @@ elif menu == "Summary Dashboard":
     if df.empty:
         empty_state_card("No parking logs recorded yet.")
     else:
-        col_week, col_loc = st.columns(2)
-
         today = datetime.now()
-        if today.weekday() == 6:
-            curr_calc_date = today - timedelta(days=1)
+        current_year = today.year
+
+        available_weeks = sorted(df["Week_Number"].dropna().unique().astype(int))
+
+        if not available_weeks:
+            empty_state_card("No valid week numbers found in data.")
         else:
-            curr_calc_date = today
+            col_week, col_loc = st.columns(2)
 
-        current_week = curr_calc_date.isocalendar()[1]
-        current_year = curr_calc_date.year
-
-        with col_week:
-            selected_week = st.selectbox(
-                "Select Week Number & Dates:",
-                options=list(range(1, 54)),
-                index=int(current_week) - 1,
-                format_func=lambda w: get_week_date_range(current_year, w),
-                key="dash_week",
-            )
-
-        with col_loc:
-            selected_dash_loc = st.selectbox(
-                "Filter Location:",
-                ["All Locations"] + list(LOCATION_CONFIG.keys()),
-                key="dash_loc_filter",
-            )
-
-        week_df = df[df["Week_Number"] == selected_week]
-
-        if week_df.empty:
-            empty_state_card(f"No records found for Week {selected_week}.")
-        else:
-            filtered_dash_df = (
-                week_df
-                if selected_dash_loc == "All Locations"
-                else week_df[week_df["Location"] == selected_dash_loc]
-            )
-
-            if filtered_dash_df.empty:
-                empty_state_card(
-                    f"No records logged for {selected_dash_loc} in Week {selected_week}."
+            with col_week:
+                selected_week = st.selectbox(
+                    "Select Week Number & Dates:",
+                    options=available_weeks,
+                    format_func=lambda w: get_week_date_range(current_year, w),
+                    key="dash_week",
                 )
+
+            with col_loc:
+                selected_dash_loc = st.selectbox(
+                    "Filter Location:",
+                    ["All Locations"] + list(LOCATION_CONFIG.keys()),
+                    key="dash_loc_filter",
+                )
+
+            week_df = df[df["Week_Number"] == selected_week]
+
+            if week_df.empty:
+                empty_state_card(f"No records found for Week {selected_week}.")
             else:
-                total_cars_all = filtered_dash_df["Car_Count"].sum()
-                total_motors_all = filtered_dash_df["Motorcycle_Count"].sum()
-                grand_total_vehicles = total_cars_all + total_motors_all
-
-                st.divider()
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    st.markdown(
-                        render_kpi_card(
-                            "Total Cars",
-                            total_cars_all,
-                            "🚘",
-                            "linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)",
-                        ),
-                        unsafe_allow_html=True,
-                    )
-                with c2:
-                    st.markdown(
-                        render_kpi_card(
-                            "Total Motorcycles",
-                            total_motors_all,
-                            "🛵",
-                            "linear-gradient(90deg, #10b981 0%, #047857 100%)",
-                        ),
-                        unsafe_allow_html=True,
-                    )
-                with c3:
-                    st.markdown(
-                        render_kpi_card(
-                            "Grand Total Vehicles",
-                            grand_total_vehicles,
-                            "📊",
-                            "linear-gradient(90deg, #8b5cf6 0%, #6d28d9 100%)",
-                        ),
-                        unsafe_allow_html=True,
-                    )
-
-                # --- COMPACT REPORTING COMPLETION PERCENTAGE LINE WITH HOVER MISSING SERVICES TOOLTIP ---
-                eval_locations = (
-                    list(LOCATION_CONFIG.keys())
+                filtered_dash_df = (
+                    week_df
                     if selected_dash_loc == "All Locations"
-                    else [selected_dash_loc]
-                )
-                total_expected_all = sum(
-                    len(LOCATION_CONFIG[l]["services"]) for l in eval_locations
-                )
-                total_submitted_all = 0
-                missing_services_dict = {}
-
-                for l in eval_locations:
-                    l_df = week_df[week_df["Location"] == l]
-                    exp_svcs = LOCATION_CONFIG[l]["services"]
-                    logged_svcs = set(
-                        l_df[l_df["Service"].isin(exp_svcs)]["Service"].unique()
-                    )
-                    total_submitted_all += len(logged_svcs)
-
-                    missing_for_loc = [
-                        svc for svc in exp_svcs if svc not in logged_svcs
-                    ]
-                    if missing_for_loc:
-                        missing_services_dict[l] = missing_for_loc
-
-                overall_pct = (
-                    min(
-                        100,
-                        int(
-                            (total_submitted_all / total_expected_all) * 100
-                        ),
-                    )
-                    if total_expected_all > 0
-                    else 0
-                )
-                label_target = (
-                    "All Locations"
-                    if selected_dash_loc == "All Locations"
-                    else selected_dash_loc
+                    else week_df[week_df["Location"] == selected_dash_loc]
                 )
 
-                # Build hover tooltip string listing missing services
-                if missing_services_dict:
-                    tooltip_lines = []
-                    for loc_name, svcs in missing_services_dict.items():
-                        tooltip_lines.append(
-                            f"{loc_name}: " + ", ".join(svcs)
-                        )
-                    tooltip_text = "Missing Reports — " + " | ".join(
-                        tooltip_lines
+                if filtered_dash_df.empty:
+                    empty_state_card(
+                        f"No records logged for {selected_dash_loc} in Week {selected_week}."
                     )
                 else:
-                    tooltip_text = "All regular services have submitted reports!"
+                    total_cars_all = filtered_dash_df["Car_Count"].sum()
+                    total_motors_all = filtered_dash_df[
+                        "Motorcycle_Count"
+                    ].sum()
+                    grand_total_vehicles = total_cars_all + total_motors_all
 
-                st.markdown(
-                    f'<span title="{tooltip_text}" style="cursor: help; border-bottom: 1px dotted #94a3b8;">'
-                    f"📋 **Reporting Completion ({label_target} — Week {selected_week}):**"
-                    f" **{total_submitted_all}/{total_expected_all}** Regular"
-                    f" Services Submitted (**{overall_pct}%**) ℹ️"
-                    f"</span>",
-                    unsafe_allow_html=True,
-                )
+                    st.divider()
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.markdown(
+                            render_kpi_card(
+                                "Total Cars",
+                                total_cars_all,
+                                "🚘",
+                                "linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)",
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                    with c2:
+                        st.markdown(
+                            render_kpi_card(
+                                "Total Motorcycles",
+                                total_motors_all,
+                                "🛵",
+                                "linear-gradient(90deg, #10b981 0%, #047857 100%)",
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                    with c3:
+                        st.markdown(
+                            render_kpi_card(
+                                "Grand Total Vehicles",
+                                grand_total_vehicles,
+                                "📊",
+                                "linear-gradient(90deg, #8b5cf6 0%, #6d28d9 100%)",
+                            ),
+                            unsafe_allow_html=True,
+                        )
 
-                st.divider()
-
-                # --- 3 SUB-TABS: SUMMARY, CHARTS, & 2026 TRENDLINE ---
-                tab_summary, tab_charts, tab_trend = st.tabs([
-                    "📋 Executive Summary List",
-                    "📊 Visual Analytics & Graphs",
-                    "📈 2026 Weekly Trend Line",
-                ])
-
-                # SUB-TAB 1: EXECUTIVE SUMMARY TEXT LIST
-                with tab_summary:
-                    target_locations = (
+                    # --- COMPACT REPORTING COMPLETION PERCENTAGE LINE WITH HOVER MISSING SERVICES TOOLTIP ---
+                    eval_locations = (
                         list(LOCATION_CONFIG.keys())
                         if selected_dash_loc == "All Locations"
                         else [selected_dash_loc]
                     )
+                    total_expected_all = sum(
+                        len(LOCATION_CONFIG[l]["services"]) for l in eval_locations
+                    )
+                    total_submitted_all = 0
+                    missing_services_dict = {}
 
-                    for loc in target_locations:
-                        loc_df = week_df[week_df["Location"] == loc]
+                    for l in eval_locations:
+                        l_df = week_df[week_df["Location"] == l]
+                        exp_svcs = LOCATION_CONFIG[l]["services"]
+                        logged_svcs = set(
+                            l_df[l_df["Service"].isin(exp_svcs)][
+                                "Service"
+                            ].unique()
+                        )
+                        total_submitted_all += len(logged_svcs)
 
-                        if not loc_df.empty:
-                            with st.container(border=True):
-                                st.markdown(f"### 📍 {loc}")
+                        missing_for_loc = [
+                            svc for svc in exp_svcs if svc not in logged_svcs
+                        ]
+                        if missing_for_loc:
+                            missing_services_dict[l] = missing_for_loc
 
-                                service_grouped = (
-                                    loc_df.groupby("Service")[
-                                        ["Car_Count", "Motorcycle_Count"]
-                                    ]
-                                    .sum()
-                                    .reset_index()
-                                )
+                    overall_pct = (
+                        min(
+                            100,
+                            int(
+                                (total_submitted_all / total_expected_all)
+                                * 100
+                            ),
+                        )
+                        if total_expected_all > 0
+                        else 0
+                    )
+                    label_target = (
+                        "All Locations"
+                        if selected_dash_loc == "All Locations"
+                        else selected_dash_loc
+                    )
 
-                                expected_services = LOCATION_CONFIG[loc][
-                                    "services"
-                                ]
-                                config_services = expected_services + list(
-                                    set(service_grouped["Service"])
-                                    - set(expected_services)
-                                )
-                                service_grouped["Service"] = pd.Categorical(
-                                    service_grouped["Service"],
-                                    categories=config_services,
-                                    ordered=True,
-                                )
-                                service_grouped = service_grouped.sort_values(
-                                    "Service"
-                                )
+                    # Build hover tooltip string listing missing services
+                    if missing_services_dict:
+                        tooltip_lines = []
+                        for loc_name, svcs in missing_services_dict.items():
+                            tooltip_lines.append(
+                                f"{loc_name}: " + ", ".join(svcs)
+                            )
+                        tooltip_text = "Missing Reports — " + " | ".join(
+                            tooltip_lines
+                        )
+                    else:
+                        tooltip_text = (
+                            "All regular services have submitted reports!"
+                        )
 
-                                loc_cars = 0
-                                loc_motors = 0
+                    st.markdown(
+                        f'<span title="{tooltip_text}" style="cursor: help; border-bottom: 1px dotted #94a3b8;">'
+                        f"📋 **Reporting Completion ({label_target} — Week {selected_week}):**"
+                        f" **{total_submitted_all}/{total_expected_all}** Regular"
+                        f" Services Submitted (**{overall_pct}%**) ℹ️"
+                        f"</span>",
+                        unsafe_allow_html=True,
+                    )
 
-                                for _, row in service_grouped.iterrows():
-                                    svc = row["Service"]
-                                    c = int(row["Car_Count"])
-                                    m = int(row["Motorcycle_Count"])
-                                    tot = c + m
-                                    loc_cars += c
-                                    loc_motors += m
+                    st.divider()
 
-                                    st.write(
-                                        f"• **{svc}:** {c:,} Cars | {m:,}"
-                                        f" Motorcycles *(Total: {tot:,})*"
+                    # --- 3 SUB-TABS: SUMMARY, CHARTS, & 2026 TRENDLINE ---
+                    tab_summary, tab_charts, tab_trend = st.tabs([
+                        "📋 Executive Summary List",
+                        "📊 Visual Analytics & Graphs",
+                        "📈 2026 Weekly Trend Line",
+                    ])
+
+                    # SUB-TAB 1: EXECUTIVE SUMMARY TEXT LIST
+                    with tab_summary:
+                        target_locations = (
+                            list(LOCATION_CONFIG.keys())
+                            if selected_dash_loc == "All Locations"
+                            else [selected_dash_loc]
+                        )
+
+                        for loc in target_locations:
+                            loc_df = week_df[week_df["Location"] == loc]
+
+                            if not loc_df.empty:
+                                with st.container(border=True):
+                                    st.markdown(f"### 📍 {loc}")
+
+                                    service_grouped = (
+                                        loc_df.groupby("Service")[
+                                            ["Car_Count", "Motorcycle_Count"]
+                                        ]
+                                        .sum()
+                                        .reset_index()
                                     )
 
-                                loc_combined = loc_cars + loc_motors
-                                st.success(
-                                    f"**{loc} Subtotal:** {loc_cars:,} Cars +"
-                                    f" {loc_motors:,} Motorcycles = **{loc_combined:,}"
-                                    " Total Vehicles**"
-                                )
-                        else:
-                            with st.container(border=True):
-                                st.markdown(f"### 📍 {loc}")
-                                st.info(
-                                    f"No reports submitted yet for {loc} in Week"
-                                    f" {selected_week}."
-                                )
+                                    expected_services = LOCATION_CONFIG[loc][
+                                        "services"
+                                    ]
+                                    config_services = expected_services + list(
+                                        set(service_grouped["Service"])
+                                        - set(expected_services)
+                                    )
+                                    service_grouped["Service"] = pd.Categorical(
+                                        service_grouped["Service"],
+                                        categories=config_services,
+                                        ordered=True,
+                                    )
+                                    service_grouped = service_grouped.sort_values(
+                                        "Service"
+                                    )
 
-                # SUB-TAB 2: VISUAL ANALYTICS & GRAPHS
-                with tab_charts:
-                    st.markdown("### ⛪ Peak Service Turnout Comparison")
-                    svc_comp = (
-                        filtered_dash_df.groupby("Service")[
-                            ["Car_Count", "Motorcycle_Count"]
-                        ]
-                        .sum()
-                        .reset_index()
-                    )
-                    svc_comp["Total"] = (
-                        svc_comp["Car_Count"] + svc_comp["Motorcycle_Count"]
-                    )
+                                    loc_cars = 0
+                                    loc_motors = 0
 
-                    fig_svc = px.bar(
-                        svc_comp,
-                        x="Service",
-                        y=["Car_Count", "Motorcycle_Count"],
-                        title=(
-                            f"Vehicle Breakdown per Worship Service (Week"
-                            f" {selected_week})"
-                        ),
-                        labels={
-                            "value": "Vehicles Logged",
-                            "variable": "Vehicle Type",
-                        },
-                        color_discrete_sequence=["#3b82f6", "#10b981"],
-                        barmode="stack",
-                        text_auto=True,
-                    )
-                    fig_svc.update_layout(
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        font_color="#f8fafc",
-                        margin=dict(l=10, r=10, t=40, b=10),
-                        legend=dict(
-                            orientation="h",
-                            yanchor="bottom",
-                            y=1.02,
-                            xanchor="right",
-                            x=1,
-                        ),
-                    )
-                    st.plotly_chart(fig_svc, use_container_width=True)
+                                    for _, row in service_grouped.iterrows():
+                                        svc = row["Service"]
+                                        c = int(row["Car_Count"])
+                                        m = int(row["Motorcycle_Count"])
+                                        tot = c + m
+                                        loc_cars += c
+                                        loc_motors += m
 
-                # SUB-TAB 3: 2026 WEEKLY ATTENDANCE TREND LINE
-                with tab_trend:
-                    st.markdown("### 📈 2026 Year-to-Date Weekly Trend")
-                    df["Total_Vehicles"] = (
-                        df["Car_Count"] + df["Motorcycle_Count"]
-                    )
-                    trend_df = (
-                        df
-                        if selected_dash_loc == "All Locations"
-                        else df[df["Location"] == selected_dash_loc]
-                    )
+                                        st.write(
+                                            f"• **{svc}:** {c:,} Cars | {m:,}"
+                                            f" Motorcycles *(Total: {tot:,})*"
+                                        )
 
-                    trend_grouped = (
-                        trend_df.groupby("Week_Number")[
-                            ["Car_Count", "Motorcycle_Count", "Total_Vehicles"]
-                        ]
-                        .sum()
-                        .reset_index()
-                        .sort_values("Week_Number")
-                    )
+                                    loc_combined = loc_cars + loc_motors
+                                    st.success(
+                                        f"**{loc} Subtotal:** {loc_cars:,} Cars +"
+                                        f" {loc_motors:,} Motorcycles = **{loc_combined:,}"
+                                        " Total Vehicles**"
+                                    )
+                            else:
+                                with st.container(border=True):
+                                    st.markdown(f"### 📍 {loc}")
+                                    st.info(
+                                        f"No reports submitted yet for {loc} in Week"
+                                        f" {selected_week}."
+                                    )
 
-                    if not trend_grouped.empty:
-                        fig_trend = go.Figure()
-
-                        fig_trend.add_trace(
-                            go.Scatter(
-                                x=trend_grouped["Week_Number"],
-                                y=trend_grouped["Total_Vehicles"],
-                                mode="lines+markers+text",
-                                name="Total Vehicles",
-                                text=trend_grouped["Total_Vehicles"],
-                                textposition="top center",
-                                textfont=dict(color="#ffffff", size=11),
-                                line=dict(color="#8b5cf6", width=3),
-                                marker=dict(size=8),
-                            )
+                    # SUB-TAB 2: VISUAL ANALYTICS & GRAPHS
+                    with tab_charts:
+                        st.markdown("### ⛪ Peak Service Turnout Comparison")
+                        svc_comp = (
+                            filtered_dash_df.groupby("Service")[
+                                ["Car_Count", "Motorcycle_Count"]
+                            ]
+                            .sum()
+                            .reset_index()
+                        )
+                        svc_comp["Total"] = (
+                            svc_comp["Car_Count"]
+                            + svc_comp["Motorcycle_Count"]
                         )
 
-                        fig_trend.add_trace(
-                            go.Scatter(
-                                x=trend_grouped["Week_Number"],
-                                y=trend_grouped["Car_Count"],
-                                mode="lines+markers+text",
-                                name="Cars",
-                                text=trend_grouped["Car_Count"],
-                                textposition="top center",
-                                textfont=dict(color="#60a5fa", size=10),
-                                line=dict(color="#3b82f6", width=2, dash="dash"),
-                                marker=dict(size=6),
-                            )
-                        )
-
-                        fig_trend.add_trace(
-                            go.Scatter(
-                                x=trend_grouped["Week_Number"],
-                                y=trend_grouped["Motorcycle_Count"],
-                                mode="lines+markers+text",
-                                name="Motorcycles",
-                                text=trend_grouped["Motorcycle_Count"],
-                                textposition="bottom center",
-                                textfont=dict(color="#34d399", size=10),
-                                line=dict(
-                                    color="#10b981", width=2, dash="dash"
-                                ),
-                                marker=dict(size=6),
-                            )
-                        )
-
-                        fig_trend.update_layout(
+                        fig_svc = px.bar(
+                            svc_comp,
+                            x="Service",
+                            y=["Car_Count", "Motorcycle_Count"],
                             title=(
-                                f"2026 Attendance Progression Across Weeks —"
-                                f" {selected_dash_loc}"
+                                f"Vehicle Breakdown per Worship Service (Week"
+                                f" {selected_week})"
                             ),
-                            xaxis_title="Week Number",
-                            yaxis_title="Total Vehicles Counted",
+                            labels={
+                                "value": "Vehicles Logged",
+                                "variable": "Vehicle Type",
+                            },
+                            color_discrete_sequence=["#3b82f6", "#10b981"],
+                            barmode="stack",
+                            text_auto=True,
+                        )
+                        fig_svc.update_layout(
                             paper_bgcolor="rgba(0,0,0,0)",
                             plot_bgcolor="rgba(0,0,0,0)",
                             font_color="#f8fafc",
@@ -1263,9 +1192,100 @@ elif menu == "Summary Dashboard":
                                 x=1,
                             ),
                         )
-                        st.plotly_chart(fig_trend, use_container_width=True)
-                    else:
-                        st.info("No historical logs available for 2026 yet.")
+                        st.plotly_chart(fig_svc, use_container_width=True)
+
+                    # SUB-TAB 3: 2026 WEEKLY ATTENDANCE TREND LINE
+                    with tab_trend:
+                        st.markdown("### 📈 2026 Year-to-Date Weekly Trend")
+                        df["Total_Vehicles"] = (
+                            df["Car_Count"] + df["Motorcycle_Count"]
+                        )
+                        trend_df = (
+                            df
+                            if selected_dash_loc == "All Locations"
+                            else df[df["Location"] == selected_dash_loc]
+                        )
+
+                        trend_grouped = (
+                            trend_df.groupby("Week_Number")[
+                                ["Car_Count", "Motorcycle_Count", "Total_Vehicles"]
+                            ]
+                            .sum()
+                            .reset_index()
+                            .sort_values("Week_Number")
+                        )
+
+                        if not trend_grouped.empty:
+                            fig_trend = go.Figure()
+
+                            fig_trend.add_trace(
+                                go.Scatter(
+                                    x=trend_grouped["Week_Number"],
+                                    y=trend_grouped["Total_Vehicles"],
+                                    mode="lines+markers+text",
+                                    name="Total Vehicles",
+                                    text=trend_grouped["Total_Vehicles"],
+                                    textposition="top center",
+                                    textfont=dict(color="#ffffff", size=11),
+                                    line=dict(color="#8b5cf6", width=3),
+                                    marker=dict(size=8),
+                                )
+                            )
+
+                            fig_trend.add_trace(
+                                go.Scatter(
+                                    x=trend_grouped["Week_Number"],
+                                    y=trend_grouped["Car_Count"],
+                                    mode="lines+markers+text",
+                                    name="Cars",
+                                    text=trend_grouped["Car_Count"],
+                                    textposition="top center",
+                                    textfont=dict(color="#60a5fa", size=10),
+                                    line=dict(
+                                        color="#3b82f6", width=2, dash="dash"
+                                    ),
+                                    marker=dict(size=6),
+                                )
+                            )
+
+                            fig_trend.add_trace(
+                                go.Scatter(
+                                    x=trend_grouped["Week_Number"],
+                                    y=trend_grouped["Motorcycle_Count"],
+                                    mode="lines+markers+text",
+                                    name="Motorcycles",
+                                    text=trend_grouped["Motorcycle_Count"],
+                                    textposition="bottom center",
+                                    textfont=dict(color="#34d399", size=10),
+                                    line=dict(
+                                        color="#10b981", width=2, dash="dash"
+                                    ),
+                                    marker=dict(size=6),
+                                )
+                            )
+
+                            fig_trend.update_layout(
+                                title=(
+                                    f"2026 Attendance Progression Across Weeks —"
+                                    f" {selected_dash_loc}"
+                                ),
+                                xaxis_title="Week Number",
+                                yaxis_title="Total Vehicles Counted",
+                                paper_bgcolor="rgba(0,0,0,0)",
+                                plot_bgcolor="rgba(0,0,0,0)",
+                                font_color="#f8fafc",
+                                margin=dict(l=10, r=10, t=40, b=10),
+                                legend=dict(
+                                    orientation="h",
+                                    yanchor="bottom",
+                                    y=1.02,
+                                    xanchor="right",
+                                    x=1,
+                                ),
+                            )
+                            st.plotly_chart(fig_trend, use_container_width=True)
+                        else:
+                            st.info("No historical logs available for 2026 yet.")
 
 # ==========================================
 # TAB 4: DATA VERIFICATION (ADMIN ONLY)
