@@ -585,7 +585,7 @@ if menu == "Log Parking Counts":
                     with cols[j]:
                         with st.container(border=True):
                             if area == "Parking 6":
-                                st.markdown(f"#### 🅿️ {area} *(Motors Only)*")
+                                st.markdown(f"#### 🅿️ {area} *(Motorscycles/E-Bikes/Tricycles Only)*")
                                 cars = 0
                                 motors = st.number_input(
                                     f"🛵 Motorcycles",
