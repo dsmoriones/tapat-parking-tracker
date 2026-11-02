@@ -74,7 +74,7 @@ LOCATION_CONFIG = {
             "Parking 3",
             "Parking 4",
             "Parking 5",
-            # "Parking 6" removed per request
+            "Parking 6",  # Restored for motorcycles only
             "Parking 7",
             "Parking 8",
             "Parking 9",
@@ -572,27 +572,44 @@ if menu == "Log Parking Counts":
                     area = active_parking_areas[i + j]
                     with cols[j]:
                         with st.container(border=True):
-                            st.markdown(f"#### 🅿️ {area}")
-                            cars = st.number_input(
-                                f"🚘 Cars",
-                                min_value=0,
-                                step=1,
-                                value=None,  # Blank by default for fast typing
-                                placeholder="0",
-                                key=f"car_{area}",
-                            )
-                            motors = st.number_input(
-                                f"🛵 Motorcycles",
-                                min_value=0,
-                                step=1,
-                                value=None,  # Blank by default for fast typing
-                                placeholder="0",
-                                key=f"motor_{area}",
-                            )
-                            counts_data[area] = {
-                                "cars": cars if cars is not None else 0,
-                                "motors": motors if motors is not None else 0,
-                            }
+                            if area == "Parking 6":
+                                # Parking 6: Motorcycles only (Cars omitted / 0)
+                                st.markdown(f"#### 🅿️ {area} *(Motors Only)*")
+                                cars = 0
+                                motors = st.number_input(
+                                    f"🛵 Motorcycles",
+                                    min_value=0,
+                                    step=1,
+                                    value=None,
+                                    placeholder="0",
+                                    key=f"motor_{area}",
+                                )
+                                counts_data[area] = {
+                                    "cars": 0,
+                                    "motors": motors if motors is not None else 0,
+                                }
+                            else:
+                                st.markdown(f"#### 🅿️ {area}")
+                                cars = st.number_input(
+                                    f"🚘 Cars",
+                                    min_value=0,
+                                    step=1,
+                                    value=None,
+                                    placeholder="0",
+                                    key=f"car_{area}",
+                                )
+                                motors = st.number_input(
+                                    f"🛵 Motorcycles",
+                                    min_value=0,
+                                    step=1,
+                                    value=None,
+                                    placeholder="0",
+                                    key=f"motor_{area}",
+                                )
+                                counts_data[area] = {
+                                    "cars": cars if cars is not None else 0,
+                                    "motors": motors if motors is not None else 0,
+                                }
 
         st.markdown("### 📷 Traffic Incident Photo Verification (Optional)")
         uploaded_file = st.file_uploader(
@@ -1176,34 +1193,44 @@ elif menu == "Data Verification" and getattr(
     else:
         st.divider()
 
-        grouped_entries = (
-            df_verify.groupby(["Timestamp", "Date", "Location", "Service"])[
-                ["Car_Count", "Motorcycle_Count"]
-            ]
-            .sum()
-            .reset_index()
-        )
+        timestamps = df_verify["Timestamp"].unique()
+        for ts in sorted(timestamps, reverse=True):
+            sub_df = df_verify[df_verify["Timestamp"] == ts]
+            loc = sub_df["Location"].iloc[0]
+            svc = sub_df["Service"].iloc[0]
+            dt = sub_df["Date"].iloc[0]
+            tot_cars = sub_df["Car_Count"].sum()
+            tot_motors = sub_df["Motorcycle_Count"].sum()
+            sub_total = tot_cars + tot_motors
 
-        for idx, row in grouped_entries.iloc[::-1].iterrows():
-            ts = row["Timestamp"]
-            dt = row["Date"]
-            loc = row["Location"]
-            svc = row["Service"]
-            cars = int(row["Car_Count"])
-            motors = int(row["Motorcycle_Count"])
-            tot = cars + motors
+            with st.expander(
+                f"🕒 {ts} | 📍 {loc} — {svc} (Total: {sub_total:,} vehicles)"
+            ):
+                col_info, col_del = st.columns([5, 1])
 
-            with st.container(border=True):
-                col_text, col_btn = st.columns([5, 1])
-
-                with col_text:
+                with col_info:
                     st.markdown(
-                        f"🕒 **`{ts}`** | 📍 **{loc}** ({svc}) — Date: `{dt}` | 🚘"
-                        f" `{cars}` | 🛵 `{motors}` | **Total: {tot}**"
+                        f"**Date:** `{dt}` | **Cars:** `{tot_cars:,}` | **Motorcycles:** `{tot_motors:,}`"
                     )
 
-                with col_btn:
-                    if st.button("🗑️ Delete", key=f"del_submission_{idx}"):
+                    table_view = sub_df[
+                        ["Parking_Area", "Car_Count", "Motorcycle_Count"]
+                    ].copy()
+                    table_view["Total"] = (
+                        table_view["Car_Count"] + table_view["Motorcycle_Count"]
+                    )
+                    table_view.columns = [
+                        "Parking Area",
+                        "Cars",
+                        "Motorcycles",
+                        "Total",
+                    ]
+                    st.dataframe(
+                        table_view, use_container_width=True, hide_index=True
+                    )
+
+                with col_del:
+                    if st.button("🗑️ Delete", key=f"del_sub_{ts}"):
                         conn, _ = get_turso_db()
                         if conn is not None:
                             try:
