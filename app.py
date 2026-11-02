@@ -19,7 +19,7 @@ except Exception as e:
 
 # --- TURSO CREDENTIALS & DB SETUP ---
 TURSO_DB_URL = "https://tapatparkingdb-dsmoriones.aws-ap-northeast-1.turso.io"
-TURSO_AUTH_TOKEN = "eyJhbGciOiIdiJzIiwiaXQiOjE3OTI2Nzk5MDgsImlkIjoiMDFhMTY0MGMtMTAwMS03YmRkLWE3ZTktODE4ZWZhYjhhYjIxIiwia2lkIjoiWk00cjVhRGMxMFYxY2Z4amJGa2YtRjZHR2VmeW9ybEt5eHVJMEpXS0tYdyIsInJpZCI6IjFiZGE2MDI0LWM1M2MtNDQzNy1iNjAxLTBiNjdmM2NjNTAyOSJ9.PuJBbsZyEt1IE-zKBZ16QPOjv185qScPfWJv_-4QbyXG-ASioALW2u54hqm3VTiLf44om3po5BRl2lzKtiAZDQ"
+TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI2Nzk5MDgsImlkIjoiMDFhMTY0MGMtMTAwMS03YmRkLWE3ZTktODE4ZWZhYjhhYjIxIiwia2lkIjoiWk00cjVhRGMxMFYxY2Z4amJGa2YtRjZHR2VmeW9ybEt5eHVJMEpXS0tYdyIsInJpZCI6IjFiZGE2MDI0LWM1M2MtNDQzNy1iNjAxLTBiNjdmM2NjNTAyOSJ9.PuJBbsZyEt1IE-zKBZ16QPOjv185qScPfWJv_-4QbyXG-ASioALW2u54hqm3VTiLf44om3po5BRl2lzKtiAZDQ"
 
 FILENAME = "tapat_parking_logs.csv"
 IMAGE_DIR = "uploaded_photos"
@@ -74,7 +74,7 @@ LOCATION_CONFIG = {
             "Parking 3",
             "Parking 4",
             "Parking 5",
-            "Parking 6",
+            "Parking 6",  # Restored for motorcycles only
             "Parking 7",
             "Parking 8",
             "Parking 9",
@@ -93,6 +93,7 @@ LOCATION_CONFIG = {
             "Tuesday Worship Service",
             "Salvation Night",
             "Empowered Night",
+            "Special Event",
         ],
         "capacity": 350,
     },
@@ -244,6 +245,35 @@ def render_status_header(is_online=True):
             <div class="status-pill" style="border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1);">
                 <span style="color: #60a5fa; font-weight: 700; font-size: 0.75rem;">🚗 TAPAT ENGINE v2.5</span>
             </div>
+        </div>
+    </div>
+    """
+
+
+def render_occupancy_gauge(current_total, max_capacity):
+    pct = min(100, int((current_total / max_capacity) * 100)) if max_capacity > 0 else 0
+    if pct >= 90:
+        bar_color = "#ef4444"
+        status_text = "🔴 CRITICAL CAPACITY"
+    elif pct >= 75:
+        bar_color = "#f59e0b"
+        status_text = "🟡 HEAVY TRAFFIC"
+    else:
+        bar_color = "#10b981"
+        status_text = "🟢 NORMAL FLOW"
+
+    return f"""
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.82rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Zone Peak Occupancy</span>
+            <span style="font-size: 0.8rem; font-weight: 700; color: {bar_color};">{status_text} ({pct}%)</span>
+        </div>
+        <div style="width: 100%; background-color: rgba(255,255,255,0.1); border-radius: 10px; height: 10px; overflow: hidden;">
+            <div style="width: {pct}%; background-color: {bar_color}; height: 100%; border-radius: 10px; transition: width 0.5s ease;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 6px;">
+            <span>Current Total: {current_total:,} vehicles</span>
+            <span>Capacity Target: {max_capacity:,}</span>
         </div>
     </div>
     """
@@ -505,9 +535,7 @@ if menu == "Log Parking Counts":
         with col_date:
             log_date = st.date_input("📅 Log Date", datetime.now())
 
-        active_services = LOCATION_CONFIG[selected_location]["services"] + [
-            "Special Event"
-        ]
+        active_services = LOCATION_CONFIG[selected_location]["services"]
         active_parking_areas = LOCATION_CONFIG[selected_location]["areas"]
 
         st.markdown("##### ⛪ Worship Service:")
@@ -545,7 +573,9 @@ if menu == "Log Parking Counts":
                     with cols[j]:
                         with st.container(border=True):
                             if area == "Parking 6":
+                                # Parking 6: Motorcycles only (Cars omitted / 0)
                                 st.markdown(f"#### 🅿️ {area} *(Motors Only)*")
+                                cars = 0
                                 motors = st.number_input(
                                     f"🛵 Motorcycles",
                                     min_value=0,
@@ -759,6 +789,15 @@ elif menu == "View Weekly Report":
                     unsafe_allow_html=True,
                 )
 
+            max_cap = (
+                LOCATION_CONFIG[report_location]["capacity"]
+                if report_location != "All Locations"
+                else sum(cfg["capacity"] for cfg in LOCATION_CONFIG.values())
+            )
+            st.markdown(
+                render_occupancy_gauge(grand_total, max_cap), unsafe_allow_html=True
+            )
+
             st.markdown("### 📈 Interactive Lot Breakdown")
 
             fig = px.bar(
@@ -930,46 +969,6 @@ elif menu == "Summary Dashboard":
                         unsafe_allow_html=True,
                     )
 
-                # --- COMPACT REPORTING COMPLETION PERCENTAGE LINE ---
-                eval_locations = (
-                    list(LOCATION_CONFIG.keys())
-                    if selected_dash_loc == "All Locations"
-                    else [selected_dash_loc]
-                )
-                total_expected_all = sum(
-                    len(LOCATION_CONFIG[l]["services"]) for l in eval_locations
-                )
-                total_submitted_all = 0
-                for l in eval_locations:
-                    l_df = week_df[week_df["Location"] == l]
-                    exp_svcs = LOCATION_CONFIG[l]["services"]
-                    logged_svcs = (
-                        l_df[l_df["Service"].isin(exp_svcs)]["Service"].unique()
-                    )
-                    total_submitted_all += len(logged_svcs)
-
-                overall_pct = (
-                    min(
-                        100,
-                        int(
-                            (total_submitted_all / total_expected_all) * 100
-                        ),
-                    )
-                    if total_expected_all > 0
-                    else 0
-                )
-                label_target = (
-                    "All Locations"
-                    if selected_dash_loc == "All Locations"
-                    else selected_dash_loc
-                )
-
-                st.markdown(
-                    f"📋 **Reporting Completion ({label_target}):**"
-                    f" **{total_submitted_all}/{total_expected_all}** Regular"
-                    f" Services Submitted (**{overall_pct}%**) "
-                )
-
                 st.divider()
 
                 # --- 3 SUB-TABS: SUMMARY, CHARTS, & 2026 TRENDLINE ---
@@ -1002,12 +1001,11 @@ elif menu == "Summary Dashboard":
                                     .reset_index()
                                 )
 
-                                expected_services = LOCATION_CONFIG[loc][
+                                config_services = LOCATION_CONFIG[loc][
                                     "services"
-                                ]
-                                config_services = expected_services + list(
+                                ] + list(
                                     set(service_grouped["Service"])
-                                    - set(expected_services)
+                                    - set(LOCATION_CONFIG[loc]["services"])
                                 )
                                 service_grouped["Service"] = pd.Categorical(
                                     service_grouped["Service"],
@@ -1040,15 +1038,8 @@ elif menu == "Summary Dashboard":
                                     f" {loc_motors:,} Motorcycles = **{loc_combined:,}"
                                     " Total Vehicles**"
                                 )
-                        else:
-                            with st.container(border=True):
-                                st.markdown(f"### 📍 {loc}")
-                                st.info(
-                                    f"No reports submitted yet for {loc} in Week"
-                                    f" {selected_week}."
-                                )
 
-                # SUB-TAB 2: VISUAL ANALYTICS & GRAPHS
+                # SUB-TAB 2: VISUAL ANALYTICS & GRAPHS (WITH DATA LABELS)
                 with tab_charts:
                     st.markdown("### ⛪ Peak Service Turnout Comparison")
                     svc_comp = (
@@ -1093,7 +1084,7 @@ elif menu == "Summary Dashboard":
                     )
                     st.plotly_chart(fig_svc, use_container_width=True)
 
-                # SUB-TAB 3: 2026 WEEKLY ATTENDANCE TREND LINE
+                # SUB-TAB 3: 2026 WEEKLY ATTENDANCE TREND LINE (WITH ALL DATA LABELS)
                 with tab_trend:
                     st.markdown("### 📈 2026 Year-to-Date Weekly Trend")
                     df["Total_Vehicles"] = (
@@ -1117,6 +1108,7 @@ elif menu == "Summary Dashboard":
                     if not trend_grouped.empty:
                         fig_trend = go.Figure()
 
+                        # Total Vehicles line with markers and text numbers
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
@@ -1131,6 +1123,7 @@ elif menu == "Summary Dashboard":
                             )
                         )
 
+                        # Cars line with markers and text numbers
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
@@ -1145,6 +1138,7 @@ elif menu == "Summary Dashboard":
                             )
                         )
 
+                        # Motorcycles line with markers and text numbers
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
