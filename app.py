@@ -66,7 +66,7 @@ if HAS_TURSO:
     init_turso_db()
 
 
-# --- HELPER: GET WEEK DATE RANGE ---
+# --- HELPER: GET WEEK DATE RANGE STRING ---
 def get_week_date_range(year, week_num):
     try:
         jan_1 = datetime(year, 1, 1)
@@ -717,13 +717,18 @@ elif menu == "View Weekly Report":
         if not available_weeks:
             empty_state_card("No valid week numbers found in data.")
         else:
+            week_options_map = {
+                get_week_date_range(current_year, w): w for w in available_weeks
+            }
+            display_labels = list(week_options_map.keys())
+
             r_col1, r_col2 = st.columns(2)
             with r_col1:
-                selected_week = st.selectbox(
+                selected_label = st.selectbox(
                     "Select Week Number & Dates:",
-                    options=available_weeks,
-                    format_func=lambda w: get_week_date_range(current_year, w),
+                    options=display_labels,
                 )
+                selected_week = week_options_map[selected_label]
             with r_col2:
                 report_location = st.selectbox(
                     "Filter by Location:",
@@ -929,15 +934,20 @@ elif menu == "Summary Dashboard":
         if not available_weeks:
             empty_state_card("No valid week numbers found in data.")
         else:
+            dash_week_options_map = {
+                get_week_date_range(current_year, w): w for w in available_weeks
+            }
+            dash_display_labels = list(dash_week_options_map.keys())
+
             col_week, col_loc = st.columns(2)
 
             with col_week:
-                selected_week = st.selectbox(
+                selected_dash_label = st.selectbox(
                     "Select Week Number & Dates:",
-                    options=available_weeks,
-                    format_func=lambda w: get_week_date_range(current_year, w),
+                    options=dash_display_labels,
                     key="dash_week",
                 )
+                selected_week = dash_week_options_map[selected_dash_label]
 
             with col_loc:
                 selected_dash_loc = st.selectbox(
