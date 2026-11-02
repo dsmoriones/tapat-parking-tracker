@@ -74,7 +74,7 @@ LOCATION_CONFIG = {
             "Parking 3",
             "Parking 4",
             "Parking 5",
-            "Parking 6",
+            # "Parking 6" removed per request
             "Parking 7",
             "Parking 8",
             "Parking 9",
@@ -574,16 +574,25 @@ if menu == "Log Parking Counts":
                         with st.container(border=True):
                             st.markdown(f"#### 🅿️ {area}")
                             cars = st.number_input(
-                                f"🚘 Cars", min_value=0, step=1, value=0, key=f"car_{area}"
+                                f"🚘 Cars",
+                                min_value=0,
+                                step=1,
+                                value=None,  # Blank by default for fast typing
+                                placeholder="0",
+                                key=f"car_{area}",
                             )
                             motors = st.number_input(
                                 f"🛵 Motorcycles",
                                 min_value=0,
                                 step=1,
-                                value=0,
+                                value=None,  # Blank by default for fast typing
+                                placeholder="0",
                                 key=f"motor_{area}",
                             )
-                            counts_data[area] = {"cars": cars, "motors": motors}
+                            counts_data[area] = {
+                                "cars": cars if cars is not None else 0,
+                                "motors": motors if motors is not None else 0,
+                            }
 
         st.markdown("### 📷 Traffic Incident Photo Verification (Optional)")
         uploaded_file = st.file_uploader(
