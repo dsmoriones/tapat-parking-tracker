@@ -93,7 +93,6 @@ LOCATION_CONFIG = {
             "Tuesday Worship Service",
             "Salvation Night",
             "Empowered Night",
-            "Special Event",
         ],
         "capacity": 350,
     },
@@ -535,7 +534,9 @@ if menu == "Log Parking Counts":
         with col_date:
             log_date = st.date_input("📅 Log Date", datetime.now())
 
-        active_services = LOCATION_CONFIG[selected_location]["services"]
+        active_services = LOCATION_CONFIG[selected_location]["services"] + [
+            "Special Event"
+        ]
         active_parking_areas = LOCATION_CONFIG[selected_location]["areas"]
 
         st.markdown("##### ⛪ Worship Service:")
@@ -969,7 +970,7 @@ elif menu == "Summary Dashboard":
                         unsafe_allow_html=True,
                     )
 
-                # --- COMPACT REPORTING COMPLETION PERCENTAGE LINE ---
+                # --- COMPACT REPORTING COMPLETION PERCENTAGE LINE (EXCLUDES SPECIAL EVENTS) ---
                 eval_locations = (
                     list(LOCATION_CONFIG.keys())
                     if selected_dash_loc == "All Locations"
@@ -982,6 +983,7 @@ elif menu == "Summary Dashboard":
                 for l in eval_locations:
                     l_df = week_df[week_df["Location"] == l]
                     exp_svcs = LOCATION_CONFIG[l]["services"]
+                    # Strictly match standard configured services only (excludes special/custom events)
                     logged_svcs = (
                         l_df[l_df["Service"].isin(exp_svcs)]["Service"].unique()
                     )
