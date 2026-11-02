@@ -65,6 +65,23 @@ def init_turso_db():
 if HAS_TURSO:
     init_turso_db()
 
+
+# --- HELPER: GET WEEK DATE RANGE ---
+def get_week_date_range(year, week_num):
+    try:
+        jan_1 = datetime(year, 1, 1)
+        # Adjust to ISO week start (Monday)
+        start_date = jan_1 + timedelta(
+            days=(week_num - 1) * 7 - jan_1.weekday()
+        )
+        end_date = start_date + timedelta(days=6)
+        return (
+            f"Week {week_num} ({start_date.strftime('%b %d')} - {end_date.strftime('%b %d')})"
+        )
+    except Exception:
+        return f"Week {week_num}"
+
+
 # --- CHURCH & LOCATION CONFIGURATION ---
 LOCATION_CONFIG = {
     "COG Dasma - Main": {
@@ -700,14 +717,15 @@ elif menu == "View Weekly Report":
             curr_calc_date = today
 
         current_week = curr_calc_date.isocalendar()[1]
+        current_year = curr_calc_date.year
 
         r_col1, r_col2 = st.columns(2)
         with r_col1:
-            selected_week = st.number_input(
-                "Select Week Number:",
-                min_value=1,
-                max_value=53,
-                value=int(current_week),
+            selected_week = st.selectbox(
+                "Select Week Number & Dates:",
+                options=list(range(1, 54)),
+                index=int(current_week) - 1,
+                format_func=lambda w: get_week_date_range(current_year, w),
             )
         with r_col2:
             report_location = st.selectbox(
@@ -900,13 +918,14 @@ elif menu == "Summary Dashboard":
             curr_calc_date = today
 
         current_week = curr_calc_date.isocalendar()[1]
+        current_year = curr_calc_date.year
 
         with col_week:
-            selected_week = st.number_input(
-                "Select Week Number:",
-                min_value=1,
-                max_value=53,
-                value=int(current_week),
+            selected_week = st.selectbox(
+                "Select Week Number & Dates:",
+                options=list(range(1, 54)),
+                index=int(current_week) - 1,
+                format_func=lambda w: get_week_date_range(current_year, w),
                 key="dash_week",
             )
 
