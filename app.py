@@ -19,7 +19,7 @@ except Exception as e:
 
 # --- TURSO CREDENTIALS & DB SETUP ---
 TURSO_DB_URL = "https://tapatparkingdb-dsmoriones.aws-ap-northeast-1.turso.io"
-TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTI2Nzk5MDgsImlkIjoiMDFhMTY0MGMtMTAwMS03YmRkLWE3ZTktODE4ZWZhYjhhYjIxIiwia2lkIjoiWk00cjVhRGMxMFYxY2Z4amJGa2YtRjZHR2VmeW9ybEt5eHVJMEpXS0tYdyIsInJpZCI6IjFiZGE2MDI0LWM1M2MtNDQzNy1iNjAxLTBiNjdmM2NjNTAyOSJ9.PuJBbsZyEt1IE-zKBZ16QPOjv185qScPfWJv_-4QbyXG-ASioALW2u54hqm3VTiLf44om3po5BRl2lzKtiAZDQ"
+TURSO_AUTH_TOKEN = "eyJhbGciOiIdiJzIiwiaXQiOjE3OTI2Nzk5MDgsImlkIjoiMDFhMTY0MGMtMTAwMS03YmRkLWE3ZTktODE4ZWZhYjhhYjIxIiwia2lkIjoiWk00cjVhRGMxMFYxY2Z4amJGa2YtRjZHR2VmeW9ybEt5eHVJMEpXS0tYdyIsInJpZCI6IjFiZGE2MDI0LWM1M2MtNDQzNy1iNjAxLTBiNjdmM2NjNTAyOSJ9.PuJBbsZyEt1IE-zKBZ16QPOjv185qScPfWJv_-4QbyXG-ASioALW2u54hqm3VTiLf44om3po5BRl2lzKtiAZDQ"
 
 FILENAME = "tapat_parking_logs.csv"
 IMAGE_DIR = "uploaded_photos"
@@ -930,36 +930,45 @@ elif menu == "Summary Dashboard":
                         unsafe_allow_html=True,
                     )
 
-                # --- REPORTING COMPLETION PROGRESS BAR (PLACED BELOW TOTAL CARS / METRICS) ---
-                target_locations_eval = (
+                # --- COMPACT REPORTING COMPLETION PERCENTAGE LINE ---
+                eval_locations = (
                     list(LOCATION_CONFIG.keys())
                     if selected_dash_loc == "All Locations"
                     else [selected_dash_loc]
                 )
-                for loc in target_locations_eval:
-                    loc_df_eval = week_df[week_df["Location"] == loc]
-                    expected_services = LOCATION_CONFIG[loc]["services"]
-                    total_expected = len(expected_services)
-                    logged_services = (
-                        loc_df_eval[
-                            loc_df_eval["Service"].isin(expected_services)
-                        ]["Service"]
-                        .unique()
+                total_expected_all = sum(
+                    len(LOCATION_CONFIG[l]["services"]) for l in eval_locations
+                )
+                total_submitted_all = 0
+                for l in eval_locations:
+                    l_df = week_df[week_df["Location"] == l]
+                    exp_svcs = LOCATION_CONFIG[l]["services"]
+                    logged_svcs = (
+                        l_df[l_df["Service"].isin(exp_svcs)]["Service"].unique()
                     )
-                    submitted_count = len(logged_services)
-                    completion_pct = (
-                        min(
-                            100, int((submitted_count / total_expected) * 100)
-                        )
-                        if total_expected > 0
-                        else 0
-                    )
+                    total_submitted_all += len(logged_svcs)
 
-                    with st.container(border=True):
-                        st.markdown(
-                            f"📋 **{loc} Reporting Status:** {submitted_count}/{total_expected} Regular Services Submitted ({completion_pct}%)"
-                        )
-                        st.progress(completion_pct / 100.0)
+                overall_pct = (
+                    min(
+                        100,
+                        int(
+                            (total_submitted_all / total_expected_all) * 100
+                        ),
+                    )
+                    if total_expected_all > 0
+                    else 0
+                )
+                label_target = (
+                    "All Locations"
+                    if selected_dash_loc == "All Locations"
+                    else selected_dash_loc
+                )
+
+                st.markdown(
+                    f"📋 **Reporting Completion ({label_target}):**"
+                    f" **{total_submitted_all}/{total_expected_all}** Regular"
+                    f" Services Submitted (**{overall_pct}%**) "
+                )
 
                 st.divider()
 
@@ -970,7 +979,7 @@ elif menu == "Summary Dashboard":
                     "📈 2026 Weekly Trend Line",
                 ])
 
-                # SUB-TAB 1: EXECUTIVE SUMMARY TEXT LIST (CLEAN TEXT ONLY)
+                # SUB-TAB 1: EXECUTIVE SUMMARY TEXT LIST
                 with tab_summary:
                     target_locations = (
                         list(LOCATION_CONFIG.keys())
