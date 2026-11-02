@@ -969,6 +969,46 @@ elif menu == "Summary Dashboard":
                         unsafe_allow_html=True,
                     )
 
+                # --- COMPACT REPORTING COMPLETION PERCENTAGE LINE ---
+                eval_locations = (
+                    list(LOCATION_CONFIG.keys())
+                    if selected_dash_loc == "All Locations"
+                    else [selected_dash_loc]
+                )
+                total_expected_all = sum(
+                    len(LOCATION_CONFIG[l]["services"]) for l in eval_locations
+                )
+                total_submitted_all = 0
+                for l in eval_locations:
+                    l_df = week_df[week_df["Location"] == l]
+                    exp_svcs = LOCATION_CONFIG[l]["services"]
+                    logged_svcs = (
+                        l_df[l_df["Service"].isin(exp_svcs)]["Service"].unique()
+                    )
+                    total_submitted_all += len(logged_svcs)
+
+                overall_pct = (
+                    min(
+                        100,
+                        int(
+                            (total_submitted_all / total_expected_all) * 100
+                        ),
+                    )
+                    if total_expected_all > 0
+                    else 0
+                )
+                label_target = (
+                    "All Locations"
+                    if selected_dash_loc == "All Locations"
+                    else selected_dash_loc
+                )
+
+                st.markdown(
+                    f"📋 **Reporting Completion ({label_target} — Week {selected_week}):**"
+                    f" **{total_submitted_all}/{total_expected_all}** Regular"
+                    f" Services Submitted (**{overall_pct}%**)"
+                )
+
                 st.divider()
 
                 # --- 3 SUB-TABS: SUMMARY, CHARTS, & 2026 TRENDLINE ---
@@ -1001,11 +1041,12 @@ elif menu == "Summary Dashboard":
                                     .reset_index()
                                 )
 
-                                config_services = LOCATION_CONFIG[loc][
+                                expected_services = LOCATION_CONFIG[loc][
                                     "services"
-                                ] + list(
+                                ]
+                                config_services = expected_services + list(
                                     set(service_grouped["Service"])
-                                    - set(LOCATION_CONFIG[loc]["services"])
+                                    - set(expected_services)
                                 )
                                 service_grouped["Service"] = pd.Categorical(
                                     service_grouped["Service"],
@@ -1038,8 +1079,15 @@ elif menu == "Summary Dashboard":
                                     f" {loc_motors:,} Motorcycles = **{loc_combined:,}"
                                     " Total Vehicles**"
                                 )
+                        else:
+                            with st.container(border=True):
+                                st.markdown(f"### 📍 {loc}")
+                                st.info(
+                                    f"No reports submitted yet for {loc} in Week"
+                                    f" {selected_week}."
+                                )
 
-                # SUB-TAB 2: VISUAL ANALYTICS & GRAPHS (WITH DATA LABELS)
+                # SUB-TAB 2: VISUAL ANALYTICS & GRAPHS
                 with tab_charts:
                     st.markdown("### ⛪ Peak Service Turnout Comparison")
                     svc_comp = (
@@ -1084,7 +1132,7 @@ elif menu == "Summary Dashboard":
                     )
                     st.plotly_chart(fig_svc, use_container_width=True)
 
-                # SUB-TAB 3: 2026 WEEKLY ATTENDANCE TREND LINE (WITH ALL DATA LABELS)
+                # SUB-TAB 3: 2026 WEEKLY ATTENDANCE TREND LINE
                 with tab_trend:
                     st.markdown("### 📈 2026 Year-to-Date Weekly Trend")
                     df["Total_Vehicles"] = (
@@ -1108,7 +1156,6 @@ elif menu == "Summary Dashboard":
                     if not trend_grouped.empty:
                         fig_trend = go.Figure()
 
-                        # Total Vehicles line with markers and text numbers
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
@@ -1123,7 +1170,6 @@ elif menu == "Summary Dashboard":
                             )
                         )
 
-                        # Cars line with markers and text numbers
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
@@ -1138,7 +1184,6 @@ elif menu == "Summary Dashboard":
                             )
                         )
 
-                        # Motorcycles line with markers and text numbers
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
