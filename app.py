@@ -930,6 +930,39 @@ elif menu == "Summary Dashboard":
                         unsafe_allow_html=True,
                     )
 
+                # --- REPORTING COMPLETION PROGRESS BAR (PLACED BELOW TOTAL CARS / METRICS) ---
+                target_locations_eval = (
+                    list(LOCATION_CONFIG.keys())
+                    if selected_dash_loc == "All Locations"
+                    else [selected_dash_loc]
+                )
+                for loc in target_locations_eval:
+                    loc_df_eval = week_df[week_df["Location"] == loc]
+                    expected_services = LOCATION_CONFIG[loc]["services"]
+                    total_expected = len(expected_services)
+                    logged_services = (
+                        loc_df_eval[
+                            loc_df_eval["Service"].isin(expected_services)
+                        ]["Service"]
+                        .unique()
+                    )
+                    submitted_count = len(logged_services)
+                    completion_pct = (
+                        min(
+                            100, int((submitted_count / total_expected) * 100)
+                        )
+                        if total_expected > 0
+                        else 0
+                    )
+
+                    with st.container(border=True):
+                        st.markdown(
+                            f"📋 **{loc} Reporting Status:** {submitted_count}/{total_expected} Regular Services Submitted ({completion_pct}%)"
+                        )
+                        st.progress(completion_pct / 100.0)
+
+                st.divider()
+
                 # --- 3 SUB-TABS: SUMMARY, CHARTS, & 2026 TRENDLINE ---
                 tab_summary, tab_charts, tab_trend = st.tabs([
                     "📋 Executive Summary List",
@@ -937,7 +970,7 @@ elif menu == "Summary Dashboard":
                     "📈 2026 Weekly Trend Line",
                 ])
 
-                # SUB-TAB 1: EXECUTIVE SUMMARY TEXT LIST WITH REPORT COMPLETION %
+                # SUB-TAB 1: EXECUTIVE SUMMARY TEXT LIST (CLEAN TEXT ONLY)
                 with tab_summary:
                     target_locations = (
                         list(LOCATION_CONFIG.keys())
@@ -947,38 +980,11 @@ elif menu == "Summary Dashboard":
 
                     for loc in target_locations:
                         loc_df = week_df[week_df["Location"] == loc]
-                        expected_services = LOCATION_CONFIG[loc]["services"]
-                        total_expected = len(expected_services)
 
-                        # Exclude special events when calculating report submission completion
-                        logged_services = (
-                            loc_df[loc_df["Service"].isin(expected_services)][
-                                "Service"
-                            ]
-                            .unique()
-                        )
-                        submitted_count = len(logged_services)
-                        completion_pct = (
-                            min(
-                                100,
-                                int(
-                                    (submitted_count / total_expected) * 100
-                                ),
-                            )
-                            if total_expected > 0
-                            else 0
-                        )
+                        if not loc_df.empty:
+                            with st.container(border=True):
+                                st.markdown(f"### 📍 {loc}")
 
-                        with st.container(border=True):
-                            st.markdown(f"### 📍 {loc}")
-
-                            # Progress bar & status for regular services reporting positioned right below total cards structure
-                            st.markdown(
-                                f"**Reporting Completion:** {submitted_count}/{total_expected} Regular Services ({completion_pct}%)"
-                            )
-                            st.progress(completion_pct / 100.0)
-
-                            if not loc_df.empty:
                                 service_grouped = (
                                     loc_df.groupby("Service")[
                                         ["Car_Count", "Motorcycle_Count"]
@@ -987,6 +993,9 @@ elif menu == "Summary Dashboard":
                                     .reset_index()
                                 )
 
+                                expected_services = LOCATION_CONFIG[loc][
+                                    "services"
+                                ]
                                 config_services = expected_services + list(
                                     set(service_grouped["Service"])
                                     - set(expected_services)
@@ -1022,7 +1031,9 @@ elif menu == "Summary Dashboard":
                                     f" {loc_motors:,} Motorcycles = **{loc_combined:,}"
                                     " Total Vehicles**"
                                 )
-                            else:
+                        else:
+                            with st.container(border=True):
+                                st.markdown(f"### 📍 {loc}")
                                 st.info(
                                     f"No reports submitted yet for {loc} in Week"
                                     f" {selected_week}."
