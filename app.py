@@ -74,7 +74,7 @@ LOCATION_CONFIG = {
             "Parking 3",
             "Parking 4",
             "Parking 5",
-            "Parking 6",  # Restored for motorcycles only
+            "Parking 6",
             "Parking 7",
             "Parking 8",
             "Parking 9",
@@ -93,7 +93,6 @@ LOCATION_CONFIG = {
             "Tuesday Worship Service",
             "Salvation Night",
             "Empowered Night",
-            "Special Event",
         ],
         "capacity": 350,
     },
@@ -245,35 +244,6 @@ def render_status_header(is_online=True):
             <div class="status-pill" style="border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1);">
                 <span style="color: #60a5fa; font-weight: 700; font-size: 0.75rem;">🚗 TAPAT ENGINE v2.5</span>
             </div>
-        </div>
-    </div>
-    """
-
-
-def render_occupancy_gauge(current_total, max_capacity):
-    pct = min(100, int((current_total / max_capacity) * 100)) if max_capacity > 0 else 0
-    if pct >= 90:
-        bar_color = "#ef4444"
-        status_text = "🔴 CRITICAL CAPACITY"
-    elif pct >= 75:
-        bar_color = "#f59e0b"
-        status_text = "🟡 HEAVY TRAFFIC"
-    else:
-        bar_color = "#10b981"
-        status_text = "🟢 NORMAL FLOW"
-
-    return f"""
-    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px; margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span style="font-size: 0.82rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Zone Peak Occupancy</span>
-            <span style="font-size: 0.8rem; font-weight: 700; color: {bar_color};">{status_text} ({pct}%)</span>
-        </div>
-        <div style="width: 100%; background-color: rgba(255,255,255,0.1); border-radius: 10px; height: 10px; overflow: hidden;">
-            <div style="width: {pct}%; background-color: {bar_color}; height: 100%; border-radius: 10px; transition: width 0.5s ease;"></div>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 6px;">
-            <span>Current Total: {current_total:,} vehicles</span>
-            <span>Capacity Target: {max_capacity:,}</span>
         </div>
     </div>
     """
@@ -535,7 +505,9 @@ if menu == "Log Parking Counts":
         with col_date:
             log_date = st.date_input("📅 Log Date", datetime.now())
 
-        active_services = LOCATION_CONFIG[selected_location]["services"]
+        active_services = LOCATION_CONFIG[selected_location]["services"] + [
+            "Special Event"
+        ]
         active_parking_areas = LOCATION_CONFIG[selected_location]["areas"]
 
         st.markdown("##### ⛪ Worship Service:")
@@ -573,9 +545,7 @@ if menu == "Log Parking Counts":
                     with cols[j]:
                         with st.container(border=True):
                             if area == "Parking 6":
-                                # Parking 6: Motorcycles only (Cars omitted / 0)
                                 st.markdown(f"#### 🅿️ {area} *(Motors Only)*")
-                                cars = 0
                                 motors = st.number_input(
                                     f"🛵 Motorcycles",
                                     min_value=0,
@@ -789,15 +759,6 @@ elif menu == "View Weekly Report":
                     unsafe_allow_html=True,
                 )
 
-            max_cap = (
-                LOCATION_CONFIG[report_location]["capacity"]
-                if report_location != "All Locations"
-                else sum(cfg["capacity"] for cfg in LOCATION_CONFIG.values())
-            )
-            st.markdown(
-                render_occupancy_gauge(grand_total, max_cap), unsafe_allow_html=True
-            )
-
             st.markdown("### 📈 Interactive Lot Breakdown")
 
             fig = px.bar(
@@ -978,7 +939,7 @@ elif menu == "Summary Dashboard":
                     "📈 2026 Weekly Trend Line",
                 ])
 
-                # SUB-TAB 1: EXECUTIVE SUMMARY TEXT LIST
+                # SUB-TAB 1: EXECUTIVE SUMMARY TEXT LIST WITH REPORT COMPLETION %
                 with tab_summary:
                     target_locations = (
                         list(LOCATION_CONFIG.keys())
@@ -988,11 +949,38 @@ elif menu == "Summary Dashboard":
 
                     for loc in target_locations:
                         loc_df = week_df[week_df["Location"] == loc]
+                        expected_services = LOCATION_CONFIG[loc]["services"]
+                        total_expected = len(expected_services)
 
-                        if not loc_df.empty:
-                            with st.container(border=True):
-                                st.markdown(f"### 📍 {loc}")
+                        # Exclude special events when calculating report submission completion
+                        logged_services = (
+                            loc_df[loc_df["Service"].isin(expected_services)][
+                                "Service"
+                            ]
+                            .unique()
+                        )
+                        submitted_count = len(logged_services)
+                        completion_pct = (
+                            min(
+                                100,
+                                int(
+                                    (submitted_count / total_expected) * 100
+                                ),
+                            )
+                            if total_expected > 0
+                            else 0
+                        )
 
+                        with st.container(border=True):
+                            st.markdown(f"### 📍 {loc}")
+
+                            # Progress bar & status for regular services reporting
+                            st.markdown(
+                                f"**Reporting Completion:** {submitted_count}/{total_expected} Regular Services ({completion_pct}%)"
+                            )
+                            st.progress(completion_pct / 100.0)
+
+                            if not loc_df.empty:
                                 service_grouped = (
                                     loc_df.groupby("Service")[
                                         ["Car_Count", "Motorcycle_Count"]
@@ -1001,11 +989,9 @@ elif menu == "Summary Dashboard":
                                     .reset_index()
                                 )
 
-                                config_services = LOCATION_CONFIG[loc][
-                                    "services"
-                                ] + list(
+                                config_services = expected_services + list(
                                     set(service_grouped["Service"])
-                                    - set(LOCATION_CONFIG[loc]["services"])
+                                    - set(expected_services)
                                 )
                                 service_grouped["Service"] = pd.Categorical(
                                     service_grouped["Service"],
@@ -1038,8 +1024,13 @@ elif menu == "Summary Dashboard":
                                     f" {loc_motors:,} Motorcycles = **{loc_combined:,}"
                                     " Total Vehicles**"
                                 )
+                            else:
+                                st.info(
+                                    f"No reports submitted yet for {loc} in Week"
+                                    f" {selected_week}."
+                                )
 
-                # SUB-TAB 2: VISUAL ANALYTICS & GRAPHS (WITH DATA LABELS)
+                # SUB-TAB 2: VISUAL ANALYTICS & GRAPHS
                 with tab_charts:
                     st.markdown("### ⛪ Peak Service Turnout Comparison")
                     svc_comp = (
@@ -1084,7 +1075,7 @@ elif menu == "Summary Dashboard":
                     )
                     st.plotly_chart(fig_svc, use_container_width=True)
 
-                # SUB-TAB 3: 2026 WEEKLY ATTENDANCE TREND LINE (WITH ALL DATA LABELS)
+                # SUB-TAB 3: 2026 WEEKLY ATTENDANCE TREND LINE
                 with tab_trend:
                     st.markdown("### 📈 2026 Year-to-Date Weekly Trend")
                     df["Total_Vehicles"] = (
@@ -1108,7 +1099,6 @@ elif menu == "Summary Dashboard":
                     if not trend_grouped.empty:
                         fig_trend = go.Figure()
 
-                        # Total Vehicles line with markers and text numbers
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
@@ -1123,7 +1113,6 @@ elif menu == "Summary Dashboard":
                             )
                         )
 
-                        # Cars line with markers and text numbers
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
@@ -1138,7 +1127,6 @@ elif menu == "Summary Dashboard":
                             )
                         )
 
-                        # Motorcycles line with markers and text numbers
                         fig_trend.add_trace(
                             go.Scatter(
                                 x=trend_grouped["Week_Number"],
