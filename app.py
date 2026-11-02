@@ -66,17 +66,12 @@ if HAS_TURSO:
     init_turso_db()
 
 
-# --- HELPER: GET WEEK DATE RANGE STRING ---
+# --- HELPER: GET ROBUST ISO WEEK DATE RANGE STRING ---
 def get_week_date_range(year, week_num):
     try:
-        jan_1 = datetime(year, 1, 1)
-        start_date = jan_1 + timedelta(
-            days=(week_num - 1) * 7 - jan_1.weekday()
-        )
-        end_date = start_date + timedelta(days=6)
-        return (
-            f"Week {week_num} ({start_date.strftime('%b %d')} - {end_date.strftime('%b %d')})"
-        )
+        start_date = datetime.fromisocalendar(year, int(week_num), 1)
+        end_date = datetime.fromisocalendar(year, int(week_num), 7)
+        return f"Week {week_num} ({start_date.strftime('%b %d')} - {end_date.strftime('%b %d')})"
     except Exception:
         return f"Week {week_num}"
 
@@ -90,7 +85,7 @@ LOCATION_CONFIG = {
             "Parking 3",
             "Parking 4",
             "Parking 5",
-            "Parking 6",  # Restored for motorcycles only
+            "Parking 6",
             "Parking 7",
             "Parking 8",
             "Parking 9",
@@ -590,7 +585,6 @@ if menu == "Log Parking Counts":
                     with cols[j]:
                         with st.container(border=True):
                             if area == "Parking 6":
-                                # Parking 6: Motorcycles only (Cars omitted / 0)
                                 st.markdown(f"#### 🅿️ {area} *(Motors Only)*")
                                 cars = 0
                                 motors = st.number_input(
@@ -711,6 +705,7 @@ elif menu == "View Weekly Report":
     else:
         today = datetime.now()
         current_year = today.year
+        current_iso_week = today.isocalendar()[1]
 
         available_weeks = sorted(df["Week_Number"].dropna().unique().astype(int))
 
@@ -722,11 +717,19 @@ elif menu == "View Weekly Report":
             }
             display_labels = list(week_options_map.keys())
 
+            default_label = display_labels[-1]
+            for label, w in week_options_map.items():
+                if w == current_iso_week:
+                    default_label = label
+                    break
+            default_index = display_labels.index(default_label)
+
             r_col1, r_col2 = st.columns(2)
             with r_col1:
                 selected_label = st.selectbox(
                     "Select Week Number & Dates:",
                     options=display_labels,
+                    index=default_index,
                 )
                 selected_week = week_options_map[selected_label]
             with r_col2:
@@ -928,6 +931,7 @@ elif menu == "Summary Dashboard":
     else:
         today = datetime.now()
         current_year = today.year
+        current_iso_week = today.isocalendar()[1]
 
         available_weeks = sorted(df["Week_Number"].dropna().unique().astype(int))
 
@@ -939,12 +943,20 @@ elif menu == "Summary Dashboard":
             }
             dash_display_labels = list(dash_week_options_map.keys())
 
+            default_dash_label = dash_display_labels[-1]
+            for label, w in dash_week_options_map.items():
+                if w == current_iso_week:
+                    default_dash_label = label
+                    break
+            default_dash_index = dash_display_labels.index(default_dash_label)
+
             col_week, col_loc = st.columns(2)
 
             with col_week:
                 selected_dash_label = st.selectbox(
                     "Select Week Number & Dates:",
                     options=dash_display_labels,
+                    index=default_dash_index,
                     key="dash_week",
                 )
                 selected_week = dash_week_options_map[selected_dash_label]
