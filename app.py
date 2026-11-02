@@ -970,7 +970,7 @@ elif menu == "Summary Dashboard":
                         unsafe_allow_html=True,
                     )
 
-                # --- COMPACT REPORTING COMPLETION PERCENTAGE LINE (EXCLUDES SPECIAL EVENTS) ---
+                # --- COMPACT REPORTING COMPLETION PERCENTAGE LINE WITH HOVER MISSING SERVICES TOOLTIP ---
                 eval_locations = (
                     list(LOCATION_CONFIG.keys())
                     if selected_dash_loc == "All Locations"
@@ -980,14 +980,21 @@ elif menu == "Summary Dashboard":
                     len(LOCATION_CONFIG[l]["services"]) for l in eval_locations
                 )
                 total_submitted_all = 0
+                missing_services_dict = {}
+
                 for l in eval_locations:
                     l_df = week_df[week_df["Location"] == l]
                     exp_svcs = LOCATION_CONFIG[l]["services"]
-                    # Strictly match standard configured services only (excludes special/custom events)
-                    logged_svcs = (
+                    logged_svcs = set(
                         l_df[l_df["Service"].isin(exp_svcs)]["Service"].unique()
                     )
                     total_submitted_all += len(logged_svcs)
+
+                    missing_for_loc = [
+                        svc for svc in exp_svcs if svc not in logged_svcs
+                    ]
+                    if missing_for_loc:
+                        missing_services_dict[l] = missing_for_loc
 
                 overall_pct = (
                     min(
@@ -1005,10 +1012,26 @@ elif menu == "Summary Dashboard":
                     else selected_dash_loc
                 )
 
+                # Build hover tooltip string listing missing services
+                if missing_services_dict:
+                    tooltip_lines = []
+                    for loc_name, svcs in missing_services_dict.items():
+                        tooltip_lines.append(
+                            f"{loc_name}: " + ", ".join(svcs)
+                        )
+                    tooltip_text = "Missing Reports — " + " | ".join(
+                        tooltip_lines
+                    )
+                else:
+                    tooltip_text = "All regular services have submitted reports!"
+
                 st.markdown(
+                    f'<span title="{tooltip_text}" style="cursor: help; border-bottom: 1px dotted #94a3b8;">'
                     f"📋 **Reporting Completion ({label_target} — Week {selected_week}):**"
                     f" **{total_submitted_all}/{total_expected_all}** Regular"
-                    f" Services Submitted (**{overall_pct}%**)"
+                    f" Services Submitted (**{overall_pct}%**) ℹ️"
+                    f"</span>",
+                    unsafe_allow_html=True,
                 )
 
                 st.divider()
