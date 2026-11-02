@@ -930,8 +930,6 @@ elif menu == "Summary Dashboard":
                         unsafe_allow_html=True,
                     )
 
-                st.divider()
-
                 # --- 3 SUB-TABS: SUMMARY, CHARTS, & 2026 TRENDLINE ---
                 tab_summary, tab_charts, tab_trend = st.tabs([
                     "📋 Executive Summary List",
@@ -974,7 +972,7 @@ elif menu == "Summary Dashboard":
                         with st.container(border=True):
                             st.markdown(f"### 📍 {loc}")
 
-                            # Progress bar & status for regular services reporting
+                            # Progress bar & status for regular services reporting positioned right below total cards structure
                             st.markdown(
                                 f"**Reporting Completion:** {submitted_count}/{total_expected} Regular Services ({completion_pct}%)"
                             )
